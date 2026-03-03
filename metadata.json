@@ -1,0 +1,5 @@
+{
+  "name": "MR SUCCESS Crash Predictor",
+  "description": "Real-time Crash Multiplier Predictor system with admin-managed access keys, live crash fetching, and prediction engine.",
+  "requestFramePermissions": []
+}
