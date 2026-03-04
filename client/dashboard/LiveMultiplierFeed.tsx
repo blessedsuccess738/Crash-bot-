@@ -26,9 +26,17 @@ export default function LiveMultiplierFeed() {
           setCrashed(true);
           isRunning = false;
           clearInterval(interval);
+          
+          window.dispatchEvent(new CustomEvent('crash-feed-update', { 
+            detail: { timestamp: Date.now(), value: value.toFixed(2), type: 'CRASH' } 
+          }));
+          
           setTimeout(runGame, 3000); // Restart after 3s
         } else {
           setCurrentMultiplier(value);
+          window.dispatchEvent(new CustomEvent('crash-feed-update', { 
+            detail: { timestamp: Date.now(), value: value.toFixed(2), type: 'UPDATE' } 
+          }));
         }
       }, 100);
     };

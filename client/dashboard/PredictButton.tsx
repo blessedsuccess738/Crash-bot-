@@ -22,7 +22,7 @@ export default function PredictButton() {
     // Generate prediction using the engine
     // Pass mock history for now
     const mockHistory = Array.from({ length: 10 }, () => (Math.random() * 10).toFixed(2));
-    const prediction = getPrediction(mockHistory);
+    const prediction = await getPrediction(mockHistory);
     
     // Dispatch result
     predictionEventBus.dispatchEvent(new CustomEvent('prediction-result', { detail: prediction }));

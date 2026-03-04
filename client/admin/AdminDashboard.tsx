@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../client/auth/sessionManager';
+import { useAuth } from '../auth/sessionManager';
 import { motion } from 'framer-motion';
 
 interface UserData {

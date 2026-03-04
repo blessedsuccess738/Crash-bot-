@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import Login from './client/auth/login';
-import Signup from './client/auth/signup';
-import CrashDashboard from './client/dashboard/CrashDashboard';
-import AdminDashboard from './admin-panel/dashboard';
-import DevModeToggle from './dev-tools/devModeToggle';
-import { AuthProvider, useAuth } from './client/auth/sessionManager';
+import Login from './auth/Login';
+import Signup from './auth/Signup';
+import CrashDashboard from './dashboard/CrashDashboard';
+import AdminDashboard from './admin/AdminDashboard';
+import DevPanel from './devtools/DevPanel';
+import { AuthProvider, useAuth } from './auth/sessionManager';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, requireAdmin = false }: { children: React.ReactNode, requireAdmin?: boolean }) => {
@@ -54,7 +54,7 @@ export default function App() {
           </Routes>
           
           {/* Dev Tools Overlay */}
-          <DevModeToggle />
+          <DevPanel />
         </div>
       </Router>
     </AuthProvider>

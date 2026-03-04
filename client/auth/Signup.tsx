@@ -27,6 +27,8 @@ export default function Signup() {
 
   const handleCasinoSignup = () => {
     window.open('https://bc.game/login/regist', '_blank');
+    // Redirect to dashboard after opening casino link, assuming user will return
+    setTimeout(() => navigate('/dashboard'), 1000);
   };
 
   return (
