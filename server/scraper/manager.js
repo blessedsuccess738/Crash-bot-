@@ -4,11 +4,13 @@ import { scraperConfig } from './config.js';
 import { engine } from '../predictor-engine/engine.js';
 import { dbManager } from '../db/index.js';
 import { broadcastSSE } from '../../api/index.js';
+import { externalSites } from '../../client/config/externalSites.config.js';
 
 let browser = null;
 let page = null;
 let wsClient = null;
 let simulationInterval = null;
+let browserLogs = [];
 
 export const scraperManager = {
   getConfig: () => scraperConfig,
@@ -88,18 +90,27 @@ export const scraperManager = {
     try { await page.mouse.wheel({ deltaY }); } catch (e) {}
   },
   startRemoteBrowser: async () => {
-    scraperConfig.method = 'puppeteer';
-    scraperConfig.targetWebUrl = 'https://bc.game'; // Start at the main page for login
     if (!scraperConfig.isRunning) {
+      scraperConfig.method = 'puppeteer';
+      scraperConfig.targetWebUrl = externalSites.crashUrl;
       await scraperManager.start();
-    } else if (page) {
-      await page.goto('https://bc.game', { waitUntil: 'domcontentloaded' });
     }
+    // If already running, do nothing, just let frontend attach
   },
   goToCrash: async () => {
     if (!page) return;
-    scraperConfig.targetWebUrl = 'https://bc.game/crash';
+    scraperConfig.targetWebUrl = externalSites.crashUrl;
     await page.goto(scraperConfig.targetWebUrl, { waitUntil: 'domcontentloaded' });
+  },
+  getBrowserLogs: () => browserLogs,
+  evaluateScript: async (code) => {
+    if (!page) return { error: 'Browser not running' };
+    try {
+      const result = await page.evaluate(code);
+      return { result };
+    } catch (e) {
+      return { error: e.message };
+    }
   }
 };
 
@@ -171,6 +182,16 @@ async function startPuppeteer() {
   
   page = await browser.newPage();
   await page.setUserAgent(scraperConfig.userAgent);
+  
+  // Capture console logs for DevTools
+  page.on('console', msg => {
+    browserLogs.push({
+      type: msg.type(),
+      text: msg.text(),
+      time: new Date().toLocaleTimeString()
+    });
+    if (browserLogs.length > 100) browserLogs.shift();
+  });
   
   if (scraperConfig.cookie) {
     // Convert cookie string to puppeteer cookie objects

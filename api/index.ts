@@ -124,4 +124,13 @@ app.post("/api/dev/remote-browser/go-to-crash", async (req, res) => {
   res.json({ success: true });
 });
 
+app.get("/api/dev/remote-browser/logs", (req, res) => {
+  res.json({ logs: scraperManager.getBrowserLogs() });
+});
+
+app.post("/api/dev/remote-browser/eval", async (req, res) => {
+  const result = await scraperManager.evaluateScript(req.body.code);
+  res.json(result);
+});
+
 export default app;
