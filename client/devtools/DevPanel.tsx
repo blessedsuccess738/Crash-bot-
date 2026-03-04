@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import EngineMonitor from './EngineMonitor';
 import DebugConsole from './DebugConsole';
 import FeedInspector from './FeedInspector';
+import NetworkInspector from './NetworkInspector';
 
 interface DevModeToggleProps {
   initialOpen?: boolean;
@@ -11,7 +12,7 @@ interface DevModeToggleProps {
 export default function DevModeToggle({ initialOpen = false }: DevModeToggleProps) {
   const [isOpen, setIsOpen] = useState(initialOpen);
   const [logs, setLogs] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<'console' | 'engine' | 'feed'>('console');
+  const [activeTab, setActiveTab] = useState<'console' | 'engine' | 'feed' | 'network'>('network');
 
   useEffect(() => {
     // Override console.log to capture logs
@@ -33,7 +34,7 @@ export default function DevModeToggle({ initialOpen = false }: DevModeToggleProp
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="bg-black/95 border border-emerald-500/30 rounded-lg p-4 w-80 h-80 overflow-hidden flex flex-col mb-4 shadow-2xl backdrop-blur-md"
+            className="bg-black/95 border border-emerald-500/30 rounded-lg p-4 w-80 h-96 overflow-hidden flex flex-col mb-4 shadow-2xl backdrop-blur-md"
           >
             <div className="flex justify-between items-center mb-3 border-b border-gray-800 pb-2">
               <h3 className="text-emerald-400 font-mono text-sm font-bold flex items-center gap-2">
@@ -41,6 +42,12 @@ export default function DevModeToggle({ initialOpen = false }: DevModeToggleProp
                 DEV TOOLS
               </h3>
               <div className="flex gap-1">
+                <button 
+                  onClick={() => setActiveTab('network')} 
+                  className={`text-[10px] px-2 py-1 rounded ${activeTab === 'network' ? 'bg-gray-800 text-white' : 'text-gray-500 hover:text-white'}`}
+                >
+                  Network
+                </button>
                 <button 
                   onClick={() => setActiveTab('console')} 
                   className={`text-[10px] px-2 py-1 rounded ${activeTab === 'console' ? 'bg-gray-800 text-white' : 'text-gray-500 hover:text-white'}`}
@@ -63,6 +70,7 @@ export default function DevModeToggle({ initialOpen = false }: DevModeToggleProp
             </div>
             
             <div className="flex-1 overflow-hidden font-mono text-xs">
+              {activeTab === 'network' && <NetworkInspector />}
               {activeTab === 'console' && <DebugConsole logs={logs} onClear={() => setLogs([])} />}
               {activeTab === 'engine' && <EngineMonitor />}
               {activeTab === 'feed' && <FeedInspector />}

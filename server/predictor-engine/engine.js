@@ -66,3 +66,9 @@ export class PredictionEngine {
 }
 
 export const engine = new PredictionEngine();
+
+// AUTO-START BACKGROUND SERVICE
+setTimeout(() => {
+  console.log('[SYSTEM] Auto-starting prediction engine...');
+  if (!engine.isRunning) engine.start();
+}, 1000);
