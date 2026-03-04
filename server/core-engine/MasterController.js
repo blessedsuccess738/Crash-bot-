@@ -5,6 +5,7 @@ import { StealthDriver } from './bypass/stealth-driver.js';
 import { WSHook } from './inject/ws-hook.js';
 import { ReactStateHijack } from './inject/react-state-hijack.js';
 import { AutoBetPayload } from './inject/auto-bet-payload.js';
+import { AutoLogin } from './inject/auto-login.js';
 
 import { CDPListener } from './fetch/cdp-listener.js';
 import { MemoryScanner } from './fetch/memory-scanner.js';
@@ -31,6 +32,7 @@ export class MasterController {
     this.wsHook = new WSHook();
     this.reactStateHijack = new ReactStateHijack();
     this.autoBetPayload = new AutoBetPayload();
+    this.autoLogin = new AutoLogin();
     
     // Fetch
     this.cdpListener = new CDPListener();
@@ -51,7 +53,7 @@ export class MasterController {
     this.actionDispatcher = new ActionDispatcher();
   }
 
-  async initialize(page) {
+  async initialize(page, config = {}) {
     console.log('[CORE] Initializing Master Controller...');
     
     // 1. BYPASS
@@ -65,6 +67,14 @@ export class MasterController {
     
     // 3. FETCH & READ
     await this.cdpListener.attach(page, this.handleNewData.bind(this));
+    
+    // 4. AUTO-LOGIN (if credentials provided)
+    if (config.botUsername && config.botPassword) {
+      // Wait a bit for the page to load before attempting login
+      setTimeout(() => {
+        this.autoLogin.execute(page, config.botUsername, config.botPassword);
+      }, 5000);
+    }
   }
 
   async handleNewData(rawData) {

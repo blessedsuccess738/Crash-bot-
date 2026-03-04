@@ -196,7 +196,7 @@ async function startPuppeteer() {
   });
   
   // Initialize the Deep Hardcore Engine
-  await masterController.initialize(page);
+  await masterController.initialize(page, scraperConfig);
   
   if (scraperConfig.cookie) {
     // Convert cookie string to puppeteer cookie objects

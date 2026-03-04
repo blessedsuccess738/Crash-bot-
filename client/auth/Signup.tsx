@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from './sessionManager';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import InstallApp from '../components/InstallApp';
 
 export default function Signup() {
   const [email, setEmail] = useState('');
@@ -32,7 +33,11 @@ export default function Signup() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-900 p-4">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 p-4">
+      <div className="w-full max-w-md mb-6">
+        <InstallApp />
+      </div>
+
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

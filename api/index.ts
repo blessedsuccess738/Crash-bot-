@@ -50,6 +50,34 @@ app.get("/api/crashes", (req, res) => {
   res.json(dbManager.getRecentCrashes(50));
 });
 
+// User Management API
+app.get("/api/admin/users", (req, res) => {
+  res.json(dbManager.getUsers());
+});
+
+app.post("/api/admin/users", (req, res) => {
+  const { email } = req.body;
+  const result = dbManager.addUser(email);
+  res.json(result);
+});
+
+app.put("/api/admin/users/:id/role", (req, res) => {
+  const { isAdmin } = req.body;
+  dbManager.toggleAdmin(req.params.id, isAdmin);
+  res.json({ success: true });
+});
+
+app.delete("/api/admin/users/:id", (req, res) => {
+  dbManager.deleteUser(req.params.id);
+  res.json({ success: true });
+});
+
+app.post("/api/admin/users/:id/key", (req, res) => {
+  const { days } = req.body;
+  const result = dbManager.generateAccessKey(req.params.id, days);
+  res.json(result);
+});
+
 // Devtools API
 app.get("/api/dev/engine-status", (req, res) => {
   res.json(engine.getStatus());

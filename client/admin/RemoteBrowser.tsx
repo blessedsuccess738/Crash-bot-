@@ -46,7 +46,35 @@ export default function RemoteBrowser() {
     }
   }, [logs]);
 
+  const [config, setConfig] = useState({
+    targetWebUrl: '',
+    botUsername: '',
+    botPassword: ''
+  });
+
+  useEffect(() => {
+    // Fetch initial config
+    fetch('/api/dev/network-config')
+      .then(res => res.json())
+      .then(data => {
+        setConfig({
+          targetWebUrl: data.targetWebUrl || 'https://bc.game/game/crash',
+          botUsername: data.botUsername || '',
+          botPassword: data.botPassword || ''
+        });
+      });
+  }, []);
+
+  const updateConfig = async () => {
+    await fetch('/api/dev/network-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config)
+    });
+  };
+
   const startBrowser = async () => {
+    await updateConfig(); // Save config before starting
     await fetch('/api/dev/remote-browser/start', { method: 'POST' });
     setIsActive(true);
   };
@@ -113,23 +141,58 @@ export default function RemoteBrowser() {
 
   return (
     <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden shadow-xl mt-6">
-      <div className="p-4 border-b border-gray-700 bg-gray-800/50 flex justify-between items-center">
-        <h2 className="font-bold text-lg">Remote Browser & DevTools</h2>
-        <div className="space-x-2">
-          <button 
-            onClick={startBrowser}
-            className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded text-sm font-bold transition-colors"
-          >
-            {isActive ? 'Restart Browser' : 'Start Remote Browser'}
-          </button>
-          {isActive && (
+      <div className="p-4 border-b border-gray-700 bg-gray-800/50 flex flex-col gap-4">
+        <div className="flex justify-between items-center">
+          <h2 className="font-bold text-lg">Remote Browser & DevTools</h2>
+          <div className="space-x-2">
             <button 
-              onClick={goToCrash}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-1.5 rounded text-sm font-bold transition-colors"
+              onClick={startBrowser}
+              className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded text-sm font-bold transition-colors"
             >
-              Go to Crash Game
+              {isActive ? 'Restart Browser' : 'Start Remote Browser'}
             </button>
-          )}
+            {isActive && (
+              <button 
+                onClick={goToCrash}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-1.5 rounded text-sm font-bold transition-colors"
+              >
+                Go to Crash Game
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+          <div>
+            <label className="block text-xs text-gray-400 mb-1 uppercase font-bold">Target URL</label>
+            <input 
+              type="text" 
+              value={config.targetWebUrl}
+              onChange={e => setConfig({...config, targetWebUrl: e.target.value})}
+              className="w-full bg-black border border-gray-700 rounded p-2 text-sm text-emerald-400 font-mono"
+              placeholder="https://bc.game/game/crash"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1 uppercase font-bold">Bot Username / Email</label>
+            <input 
+              type="text" 
+              value={config.botUsername}
+              onChange={e => setConfig({...config, botUsername: e.target.value})}
+              className="w-full bg-black border border-gray-700 rounded p-2 text-sm text-gray-300 font-mono"
+              placeholder="bot@example.com"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1 uppercase font-bold">Bot Password</label>
+            <input 
+              type="password" 
+              value={config.botPassword}
+              onChange={e => setConfig({...config, botPassword: e.target.value})}
+              className="w-full bg-black border border-gray-700 rounded p-2 text-sm text-gray-300 font-mono"
+              placeholder="••••••••"
+            />
+          </div>
         </div>
       </div>
       
