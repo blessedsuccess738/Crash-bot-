@@ -80,9 +80,6 @@ export default function CircleMultiplier() {
               <span className="text-5xl font-black text-white font-mono tracking-tighter drop-shadow-[0_0_15px_rgba(16,185,129,0.5)]">
                 {prediction}x
               </span>
-              <span className="text-emerald-500 text-xs mt-2 font-bold bg-emerald-500/10 px-2 py-1 rounded">
-                CONFIDENCE: HIGH
-              </span>
             </motion.div>
           )}
         </AnimatePresence>

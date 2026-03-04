@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../auth/sessionManager';
 import { motion } from 'framer-motion';
+import RemoteBrowser from './RemoteBrowser';
 
 interface UserData {
   id: string;
@@ -75,7 +76,7 @@ export default function AdminDashboard() {
           </div>
         </header>
 
-        <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden shadow-xl">
+        <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden shadow-xl mb-8">
           <div className="p-4 border-b border-gray-700 bg-gray-800/50">
             <h2 className="font-bold text-lg">User Management</h2>
           </div>
@@ -141,6 +142,8 @@ export default function AdminDashboard() {
             </table>
           </div>
         </div>
+
+        <RemoteBrowser />
       </div>
     </div>
   );

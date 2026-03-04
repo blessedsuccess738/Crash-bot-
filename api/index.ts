@@ -84,4 +84,44 @@ app.post("/api/dev/scraper-toggle", async (req, res) => {
   res.json(scraperManager.getConfig());
 });
 
+// Remote Browser API
+app.get("/api/dev/remote-browser/screenshot", async (req, res) => {
+  const base64 = await scraperManager.getScreenshot();
+  res.json({ image: base64 });
+});
+
+app.post("/api/dev/remote-browser/click", async (req, res) => {
+  const { x, y } = req.body;
+  await scraperManager.sendClick(x, y);
+  res.json({ success: true });
+});
+
+app.post("/api/dev/remote-browser/type", async (req, res) => {
+  const { text } = req.body;
+  await scraperManager.sendType(text);
+  res.json({ success: true });
+});
+
+app.post("/api/dev/remote-browser/key", async (req, res) => {
+  const { key } = req.body;
+  await scraperManager.sendKey(key);
+  res.json({ success: true });
+});
+
+app.post("/api/dev/remote-browser/scroll", async (req, res) => {
+  const { deltaY } = req.body;
+  await scraperManager.sendScroll(deltaY);
+  res.json({ success: true });
+});
+
+app.post("/api/dev/remote-browser/start", async (req, res) => {
+  await scraperManager.startRemoteBrowser();
+  res.json({ success: true });
+});
+
+app.post("/api/dev/remote-browser/go-to-crash", async (req, res) => {
+  await scraperManager.goToCrash();
+  res.json({ success: true });
+});
+
 export default app;

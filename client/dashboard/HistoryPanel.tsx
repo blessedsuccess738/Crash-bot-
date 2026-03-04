@@ -1,23 +1,38 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// Mock data generator
-const generateHistory = () => {
-  return Array.from({ length: 15 }, () => (Math.random() * 10 + 1).toFixed(2));
-};
-
 export default function HistoryPanel() {
   const [history, setHistory] = useState<string[]>([]);
 
   useEffect(() => {
-    setHistory(generateHistory());
-    
-    // Simulate live updates
-    const interval = setInterval(() => {
-      setHistory(prev => [(Math.random() * 10 + 1).toFixed(2), ...prev.slice(0, 14)]);
-    }, 5000);
+    // Fetch initial history from database
+    const fetchHistory = async () => {
+      try {
+        const res = await fetch('/api/crashes');
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setHistory(data.map((item: any) => item.multiplier.toFixed(2)));
+        }
+      } catch (e) {
+        console.error('Failed to fetch crash history', e);
+      }
+    };
 
-    return () => clearInterval(interval);
+    fetchHistory();
+
+    // Listen to real-time crash updates
+    const handleFeedUpdate = (e: any) => {
+      const data = e.detail;
+      if (data.type === 'CRASH') {
+        setHistory(prev => {
+          const newHistory = [data.value.toFixed(2), ...prev];
+          return newHistory.slice(0, 15); // Keep only the last 15 items
+        });
+      }
+    };
+
+    window.addEventListener('crash-feed-update', handleFeedUpdate);
+    return () => window.removeEventListener('crash-feed-update', handleFeedUpdate);
   }, []);
 
   return (

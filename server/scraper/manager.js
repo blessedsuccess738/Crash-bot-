@@ -62,6 +62,44 @@ export const scraperManager = {
     
     scraperConfig.status = 'Disconnected';
     console.log('[SCRAPER] Stopped.');
+  },
+
+  // Remote Browser Controls
+  getScreenshot: async () => {
+    if (!page) return null;
+    try {
+      return await page.screenshot({ encoding: 'base64', type: 'jpeg', quality: 50 });
+    } catch (e) { return null; }
+  },
+  sendClick: async (x, y) => {
+    if (!page) return;
+    try { await page.mouse.click(x, y); } catch (e) {}
+  },
+  sendType: async (text) => {
+    if (!page) return;
+    try { await page.keyboard.type(text); } catch (e) {}
+  },
+  sendKey: async (key) => {
+    if (!page) return;
+    try { await page.keyboard.press(key); } catch (e) {}
+  },
+  sendScroll: async (deltaY) => {
+    if (!page) return;
+    try { await page.mouse.wheel({ deltaY }); } catch (e) {}
+  },
+  startRemoteBrowser: async () => {
+    scraperConfig.method = 'puppeteer';
+    scraperConfig.targetWebUrl = 'https://bc.game'; // Start at the main page for login
+    if (!scraperConfig.isRunning) {
+      await scraperManager.start();
+    } else if (page) {
+      await page.goto('https://bc.game', { waitUntil: 'domcontentloaded' });
+    }
+  },
+  goToCrash: async () => {
+    if (!page) return;
+    scraperConfig.targetWebUrl = 'https://bc.game/crash';
+    await page.goto(scraperConfig.targetWebUrl, { waitUntil: 'domcontentloaded' });
   }
 };
 
@@ -134,6 +172,23 @@ async function startPuppeteer() {
   page = await browser.newPage();
   await page.setUserAgent(scraperConfig.userAgent);
   
+  if (scraperConfig.cookie) {
+    // Convert cookie string to puppeteer cookie objects
+    try {
+      const cookies = scraperConfig.cookie.split(';').map(pair => {
+        const [name, ...rest] = pair.split('=');
+        return {
+          name: name.trim(),
+          value: rest.join('=').trim(),
+          domain: new URL(scraperConfig.targetWebUrl).hostname
+        };
+      });
+      await page.setCookie(...cookies);
+    } catch (e) {
+      console.error('[SCRAPER] Failed to parse cookies', e);
+    }
+  }
+  
   scraperConfig.status = `Navigating to ${scraperConfig.targetWebUrl}...`;
   console.log(`[SCRAPER] Navigating to ${scraperConfig.targetWebUrl}`);
   
@@ -151,10 +206,16 @@ async function startWebSocket() {
   scraperConfig.status = 'Connecting to WebSocket...';
   console.log(`[SCRAPER] Connecting to WS: ${scraperConfig.targetUrl}`);
   
+  const headers = {
+    'User-Agent': scraperConfig.userAgent
+  };
+  
+  if (scraperConfig.cookie) {
+    headers['Cookie'] = scraperConfig.cookie;
+  }
+  
   const options = {
-    headers: {
-      'User-Agent': scraperConfig.userAgent
-    },
+    headers,
     followRedirects: true
   };
 
@@ -178,14 +239,25 @@ async function startWebSocket() {
       console.log('---------------------------------------------------');
       console.log('⚠️ CLOUDFLARE OR HTTP ENDPOINT DETECTED ⚠️');
       console.log('The casino is returning a webpage instead of a WebSocket connection.');
-      console.log('Please open the DevTools (bottom right), go to the Network tab,');
-      console.log('and switch the Connection Method to "Headless Browser".');
+      console.log('Auto-switching to Headless Browser (Puppeteer) mode...');
       console.log('---------------------------------------------------');
+      
+      scraperConfig.method = 'puppeteer';
+      if (wsClient) {
+        wsClient.close();
+        wsClient = null;
+      }
+      
+      setTimeout(() => {
+        if (scraperConfig.isRunning) {
+          startPuppeteer().catch(e => console.error('[PUPPETEER ERROR]', e));
+        }
+      }, 2000);
     }
   });
 
   wsClient.on('close', () => {
-    if (scraperConfig.isRunning) {
+    if (scraperConfig.isRunning && scraperConfig.method === 'websocket') {
       scraperConfig.status = 'Disconnected (Reconnecting...)';
       console.log('[SCRAPER] WS Closed. Reconnecting in 5s...');
       setTimeout(startWebSocket, 5000);
