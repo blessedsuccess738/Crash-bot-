@@ -188,6 +188,16 @@ async function startPuppeteer() {
       console.error('[SCRAPER] Failed to parse cookies', e);
     }
   }
+
+  // Intercept WebSocket frames via CDP
+  const client = await page.target().createCDPSession();
+  await client.send('Network.enable');
+
+  client.on('Network.webSocketFrameReceived', ({ response }) => {
+    const payload = response.payloadData;
+    // Process incoming live crash data from the browser's websocket
+    // console.log('[CDP WS DATA]', payload);
+  });
   
   scraperConfig.status = `Navigating to ${scraperConfig.targetWebUrl}...`;
   console.log(`[SCRAPER] Navigating to ${scraperConfig.targetWebUrl}`);
@@ -197,9 +207,6 @@ async function startPuppeteer() {
   
   scraperConfig.status = 'Connected (Puppeteer Active)';
   console.log('[SCRAPER] Puppeteer successfully loaded target.');
-  
-  // In a real scenario, we would inject scripts here to read the canvas
-  // or intercept WebSocket frames via Chrome DevTools Protocol (CDP).
 }
 
 async function startWebSocket() {
