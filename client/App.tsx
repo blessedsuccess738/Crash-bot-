@@ -23,40 +23,48 @@ const ProtectedRoute = ({ children, requireAdmin = false }: { children: React.Re
 export default function App() {
   return (
     <AuthProvider>
-      <Router>
-        <div className="min-h-screen bg-gray-900 text-white font-sans">
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            
-            {/* Dashboard Route - Protected */}
-            <Route 
-              path="/dashboard" 
-              element={
-                <ProtectedRoute>
-                  <CrashDashboard />
-                </ProtectedRoute>
-              } 
-            />
-
-            {/* Admin Route - Protected & Admin Only */}
-            <Route 
-              path="/admin" 
-              element={
-                <ProtectedRoute requireAdmin={true}>
-                  <AdminDashboard />
-                </ProtectedRoute>
-              } 
-            />
-
-            {/* Default redirect */}
-            <Route path="/" element={<Navigate to="/login" replace />} />
-          </Routes>
-          
-          {/* Dev Tools Overlay */}
-          <DevPanel />
-        </div>
-      </Router>
+      <AppContent />
     </AuthProvider>
+  );
+}
+
+function AppContent() {
+  const { user } = useAuth();
+  
+  return (
+    <Router>
+      <div className="min-h-screen bg-gray-900 text-white font-sans">
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          
+          {/* Dashboard Route - Protected */}
+          <Route 
+            path="/dashboard" 
+            element={
+              <ProtectedRoute>
+                <CrashDashboard />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Admin Route - Protected & Admin Only */}
+          <Route 
+            path="/admin" 
+            element={
+              <ProtectedRoute requireAdmin={true}>
+                <AdminDashboard />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Default redirect */}
+          <Route path="/" element={<Navigate to="/login" replace />} />
+        </Routes>
+        
+        {/* Dev Tools Overlay - Only for Admins */}
+        {user?.isAdmin && <DevPanel />}
+      </div>
+    </Router>
   );
 }

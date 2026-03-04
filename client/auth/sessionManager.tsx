@@ -39,8 +39,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setLoading(true);
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // Mock admin login for demo purposes
-    const isAdmin = email.includes('admin');
+    // Admin logic
+    const isAdmin = email.includes('admin') || email === 'blessedsuccess738@gmail.com';
     const newUser: User = {
       id: Math.random().toString(36).substr(2, 9),
       email,
@@ -58,11 +58,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setLoading(true);
     await new Promise(resolve => setTimeout(resolve, 1000));
     
+    const isAdmin = email === 'blessedsuccess738@gmail.com';
     const newUser: User = {
       id: Math.random().toString(36).substr(2, 9),
       email,
-      isAdmin: false,
-      hasAccessKey: false,
+      isAdmin,
+      hasAccessKey: isAdmin, // Admins have access by default
     };
 
     localStorage.setItem('mr_success_user', JSON.stringify(newUser));

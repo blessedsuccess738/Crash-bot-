@@ -6,43 +6,40 @@ export default function LiveMultiplierFeed() {
   const [crashed, setCrashed] = useState(false);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    let value = 1.00;
-    let isRunning = true;
+    const eventSource = new EventSource('/api/stream');
 
-    const runGame = () => {
-      value = 1.00;
-      setCrashed(false);
-      isRunning = true;
-      
-      const crashPoint = Math.random() * 10 + 1; // Random crash point
-
-      interval = setInterval(() => {
-        if (!isRunning) return;
-
-        value += value * 0.05; // Exponential growth
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
         
-        if (value >= crashPoint) {
+        if (data.type === 'UPDATE') {
+          setCrashed(false);
+          setCurrentMultiplier(data.value);
+          // Dispatch event for devtools feed inspector
+          window.dispatchEvent(new CustomEvent('crash-feed-update', { detail: data }));
+        } else if (data.type === 'CRASH') {
           setCrashed(true);
-          isRunning = false;
-          clearInterval(interval);
-          
-          window.dispatchEvent(new CustomEvent('crash-feed-update', { 
-            detail: { timestamp: Date.now(), value: value.toFixed(2), type: 'CRASH' } 
-          }));
-          
-          setTimeout(runGame, 3000); // Restart after 3s
-        } else {
-          setCurrentMultiplier(value);
-          window.dispatchEvent(new CustomEvent('crash-feed-update', { 
-            detail: { timestamp: Date.now(), value: value.toFixed(2), type: 'UPDATE' } 
-          }));
+          setCurrentMultiplier(data.value);
+          // Dispatch event for devtools feed inspector
+          window.dispatchEvent(new CustomEvent('crash-feed-update', { detail: data }));
         }
-      }, 100);
+      } catch (e) {
+        console.error('Error parsing SSE data', e);
+      }
     };
 
-    runGame();
-    return () => clearInterval(interval);
+    eventSource.onerror = (error) => {
+      console.error('SSE Error:', error);
+      eventSource.close();
+      // Attempt to reconnect after 5 seconds
+      setTimeout(() => {
+        // Re-mount logic or just let the user refresh for now
+      }, 5000);
+    };
+
+    return () => {
+      eventSource.close();
+    };
   }, []);
 
   return (

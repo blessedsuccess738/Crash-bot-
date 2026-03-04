@@ -2,10 +2,13 @@ import puppeteer from 'puppeteer';
 import WebSocket from 'ws';
 import { scraperConfig } from './config.js';
 import { engine } from '../predictor-engine/engine.js';
+import { dbManager } from '../db/index.js';
+import { broadcastSSE } from '../../api/index.js';
 
 let browser = null;
 let page = null;
 let wsClient = null;
+let simulationInterval = null;
 
 export const scraperManager = {
   getConfig: () => scraperConfig,
@@ -26,6 +29,10 @@ export const scraperManager = {
       } else {
         await startWebSocket();
       }
+      
+      // Start simulated data feed for now until parser is built
+      startSimulation();
+      
     } catch (error) {
       scraperConfig.status = `Error: ${error.message}`;
       scraperConfig.isRunning = false;
@@ -36,6 +43,11 @@ export const scraperManager = {
   stop: async () => {
     scraperConfig.isRunning = false;
     scraperConfig.status = 'Disconnecting...';
+    
+    if (simulationInterval) {
+      clearInterval(simulationInterval);
+      simulationInterval = null;
+    }
     
     if (wsClient) {
       wsClient.close();
@@ -52,6 +64,58 @@ export const scraperManager = {
     console.log('[SCRAPER] Stopped.');
   }
 };
+
+function startSimulation() {
+  if (simulationInterval) clearInterval(simulationInterval);
+  
+  let value = 1.00;
+  let isRunning = true;
+  
+  const runGame = () => {
+    value = 1.00;
+    isRunning = true;
+    const crashPoint = Math.random() * 10 + 1;
+    
+    simulationInterval = setInterval(() => {
+      if (!isRunning || !scraperConfig.isRunning) {
+        clearInterval(simulationInterval);
+        return;
+      }
+      
+      value += value * 0.05;
+      
+      if (value >= crashPoint) {
+        isRunning = false;
+        clearInterval(simulationInterval);
+        
+        const finalValue = parseFloat(value.toFixed(2));
+        
+        // Save to Database
+        dbManager.addCrash(finalValue);
+        
+        // Broadcast to Frontend
+        broadcastSSE({
+          type: 'CRASH',
+          value: finalValue,
+          timestamp: Date.now()
+        });
+        
+        if (scraperConfig.isRunning) {
+          setTimeout(runGame, 3000);
+        }
+      } else {
+        // Broadcast live update
+        broadcastSSE({
+          type: 'UPDATE',
+          value: parseFloat(value.toFixed(2)),
+          timestamp: Date.now()
+        });
+      }
+    }, 100);
+  };
+  
+  runGame();
+}
 
 async function startPuppeteer() {
   scraperConfig.status = 'Launching Headless Browser...';
@@ -90,7 +154,8 @@ async function startWebSocket() {
   const options = {
     headers: {
       'User-Agent': scraperConfig.userAgent
-    }
+    },
+    followRedirects: true
   };
 
   wsClient = new WebSocket(scraperConfig.targetUrl, options);
@@ -108,6 +173,15 @@ async function startWebSocket() {
   wsClient.on('error', (err) => {
     scraperConfig.status = `WS Error: ${err.message}`;
     console.error('[SCRAPER] WS Error:', err.message);
+    
+    if (err.message.includes('200') || err.message.includes('403') || err.message.includes('503')) {
+      console.log('---------------------------------------------------');
+      console.log('⚠️ CLOUDFLARE OR HTTP ENDPOINT DETECTED ⚠️');
+      console.log('The casino is returning a webpage instead of a WebSocket connection.');
+      console.log('Please open the DevTools (bottom right), go to the Network tab,');
+      console.log('and switch the Connection Method to "Headless Browser".');
+      console.log('---------------------------------------------------');
+    }
   });
 
   wsClient.on('close', () => {
