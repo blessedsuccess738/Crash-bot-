@@ -5,12 +5,14 @@ import { engine } from '../predictor-engine/engine.js';
 import { dbManager } from '../db/index.js';
 import { broadcastSSE } from '../../api/index.js';
 import { externalSites } from '../../client/config/externalSites.config.js';
+import { MasterController } from '../core-engine/MasterController.js';
 
 let browser = null;
 let page = null;
 let wsClient = null;
 let simulationInterval = null;
 let browserLogs = [];
+const masterController = new MasterController();
 
 export const scraperManager = {
   getConfig: () => scraperConfig,
@@ -192,6 +194,9 @@ async function startPuppeteer() {
     });
     if (browserLogs.length > 100) browserLogs.shift();
   });
+  
+  // Initialize the Deep Hardcore Engine
+  await masterController.initialize(page);
   
   if (scraperConfig.cookie) {
     // Convert cookie string to puppeteer cookie objects
