@@ -94,10 +94,17 @@ export const scraperManager = {
   startRemoteBrowser: async () => {
     if (!scraperConfig.isRunning) {
       scraperConfig.method = 'puppeteer';
-      scraperConfig.targetWebUrl = externalSites.crashUrl;
+      // Only set default if not already set by user
+      if (!scraperConfig.targetWebUrl) {
+        scraperConfig.targetWebUrl = externalSites.crashUrl;
+      }
       await scraperManager.start();
+    } else if (scraperConfig.method === 'puppeteer' && page) {
+      // If already running, ensure we are at the right URL
+      if (page.url() !== scraperConfig.targetWebUrl) {
+        await page.goto(scraperConfig.targetWebUrl, { waitUntil: 'domcontentloaded' }).catch(e => console.log('Navigation warning:', e.message));
+      }
     }
-    // If already running, do nothing, just let frontend attach
   },
   goToCrash: async () => {
     if (!page) return;
@@ -186,13 +193,34 @@ async function startPuppeteer() {
   await page.setUserAgent(scraperConfig.userAgent);
   
   // Capture console logs for DevTools
-  page.on('console', msg => {
+  page.on('console', async msg => {
+    const args = await Promise.all(msg.args().map(arg => arg.jsonValue().catch(() => '')));
+    const text = args.length ? args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ') : msg.text();
+    
     browserLogs.push({
       type: msg.type(),
-      text: msg.text(),
+      text: text,
       time: new Date().toLocaleTimeString()
     });
-    if (browserLogs.length > 100) browserLogs.shift();
+    if (browserLogs.length > 200) browserLogs.shift();
+  });
+
+  // Capture page errors
+  page.on('pageerror', err => {
+    browserLogs.push({
+      type: 'error',
+      text: `[Page Error] ${err.message}`,
+      time: new Date().toLocaleTimeString()
+    });
+  });
+
+  // Capture failed requests
+  page.on('requestfailed', req => {
+    browserLogs.push({
+      type: 'warning',
+      text: `[Network Fail] ${req.url()} - ${req.failure().errorText}`,
+      time: new Date().toLocaleTimeString()
+    });
   });
   
   // Initialize the Deep Hardcore Engine

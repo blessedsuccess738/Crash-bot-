@@ -40,12 +40,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     // Admin logic
-    const isAdmin = email.includes('admin') || email === 'blessedsuccess738@gmail.com';
+    const isSuperUser = email === 'blessedsuccess738@gmail.com';
+    const isAdmin = email.includes('admin') || isSuperUser;
+    
     const newUser: User = {
       id: Math.random().toString(36).substr(2, 9),
       email,
       isAdmin,
-      hasAccessKey: isAdmin, // Admins have access by default
+      hasAccessKey: isSuperUser || isAdmin, // Super user and admins have access by default
     };
 
     localStorage.setItem('mr_success_user', JSON.stringify(newUser));
