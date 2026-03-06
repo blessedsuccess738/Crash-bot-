@@ -10,6 +10,9 @@ export default function RemoteBrowser() {
   const imgRef = useRef<HTMLImageElement>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
+  const [selectedBrowser, setSelectedBrowser] = useState('chrome');
+  const [isAutoStart, setIsAutoStart] = useState(true);
+
   const startBrowser = async (targetUrl?: string) => {
     const urlToUse = targetUrl || config.targetWebUrl;
     setIsActive(true);
@@ -23,33 +26,21 @@ export default function RemoteBrowser() {
       await fetch('/api/dev/remote-browser/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: urlToUse })
+        body: JSON.stringify({ 
+          url: urlToUse,
+          browser: selectedBrowser 
+        })
       });
     } catch (e) {
       console.error("Failed to start browser", e);
     }
   };
 
-  const handleEval = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!evalCode.trim()) return;
-    
-    try {
-      const res = await fetch('/api/dev/remote-browser/eval', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: evalCode })
-      });
-      const data = await res.json();
-      setEvalResult(JSON.stringify(data.result, null, 2));
-    } catch (err) {
-      setEvalResult("Error executing code");
-    }
-  };
-
   useEffect(() => {
-    // Auto-start the browser when the panel is opened
-    startBrowser();
+    // Auto-start if enabled
+    if (isAutoStart) {
+      startBrowser();
+    }
   }, []);
 
   const [activeTab, setActiveTab] = useState<'console' | 'network' | 'inspector'>('console');
@@ -129,9 +120,93 @@ export default function RemoteBrowser() {
 
   // ... (rest of useEffects)
 
+  const handleEval = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!evalCode.trim()) return;
+    
+    try {
+      const res = await fetch('/api/dev/remote-browser/eval', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: evalCode })
+      });
+      const data = await res.json();
+      setEvalResult(JSON.stringify(data.result, null, 2));
+    } catch (err) {
+      setEvalResult("Error executing code");
+    }
+  };
+
   return (
     <div className="bg-[#0a0a0a] rounded-xl border border-gray-800 overflow-hidden shadow-2xl mt-6">
-      {/* ... (Header) ... */}
+      <div className="p-4 border-b border-gray-800 bg-[#050505] flex flex-col gap-4">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <div className={`w-3 h-3 rounded-full ${isActive ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
+            <h2 className="font-bold text-lg text-gray-200">Remote Browser & DevTools</h2>
+          </div>
+          <div className="flex items-center gap-3">
+            <select 
+              value={selectedBrowser}
+              onChange={(e) => setSelectedBrowser(e.target.value)}
+              className="bg-gray-900 border border-gray-700 text-gray-300 text-xs rounded px-2 py-1.5 focus:outline-none focus:border-emerald-500"
+            >
+              <option value="chrome">Chrome (Puppeteer)</option>
+              <option value="firefox">Firefox (Gecko)</option>
+              <option value="webkit">Safari (WebKit)</option>
+            </select>
+            
+            <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={isAutoStart} 
+                onChange={(e) => setIsAutoStart(e.target.checked)}
+                className="rounded bg-gray-800 border-gray-700 text-emerald-500 focus:ring-0"
+              />
+              Auto-Start
+            </label>
+
+            <button 
+              onClick={() => startBrowser()}
+              className={`px-4 py-1.5 rounded text-sm font-bold transition-all ${
+                isActive 
+                  ? 'bg-red-900/30 text-red-400 hover:bg-red-900/50 border border-red-900/50' 
+                  : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/20'
+              }`}
+            >
+              {isActive ? 'Restart Session' : 'Start Browser'}
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-[#0f0f0f] p-4 rounded-lg border border-gray-800">
+          <div>
+            <div className="flex justify-between items-end mb-1">
+              <label className="block text-[10px] text-gray-500 uppercase font-bold tracking-wider">Target URL</label>
+              <div className="flex gap-2 overflow-x-auto pb-1 max-w-[500px] scrollbar-thin scrollbar-thumb-gray-800">
+                {crashResources.map((site) => (
+                  <button
+                    key={site.name}
+                    onClick={() => handleResourceSelect(site.url)}
+                    className="text-[10px] bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white px-2 py-0.5 rounded transition-colors border border-gray-700 whitespace-nowrap"
+                  >
+                    {site.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <input 
+                type="text" 
+                value={config.targetWebUrl}
+                onChange={e => setConfig({...config, targetWebUrl: e.target.value})}
+                className="flex-1 bg-black border border-gray-800 rounded px-3 py-2 text-sm text-emerald-400 font-mono focus:border-emerald-500/50 focus:outline-none transition-colors"
+                placeholder="https://bc.game/game/crash"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
       
       <div className="flex flex-col lg:flex-row h-[600px] lg:h-[700px]">
         {/* Left Side: Video Feed */}
