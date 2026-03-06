@@ -47,34 +47,13 @@ let page = null;
 let wsClient = null;
 let simulationInterval = null;
 let browserLogs = [];
+let networkLogs = []; // New network logs
 const masterController = new MasterController();
 
-const parsers = {
-  'bc.game': bcgameParser,
-  'stake.com': stakeParser,
-  'aviator': aviatorParser,
-  'roobet.com': roobetParser,
-  'duelbits.com': duelbitsParser,
-  '1win.pro': win1Parser,
-  'pin-up.casino': pinUpParser,
-  'spribe.co': spribeParser,
-  'betfury.io': betFuryParser,
-  'trustdice.win': trustDiceParser,
-  'nanogames.io': nanogamesParser,
-  'bitsler.com': bitslerParser,
-  'earnbet.io': earnBetParser,
-  'rollbit.com': rollbitParser,
-  'gamdom.com': gamdomParser,
-  'csgoempire.com': csgoEmpireParser,
-  'datdrop.com': datDropParser,
-  'key-drop.com': keyDropParser,
-  'hellcase.com': hellcaseParser,
-  'farmskins.com': farmskinsParser,
-  'csgoroll.com': csgorollParser,
-  '1xbet.ng': xbetParser
-};
+// ... parsers definition ...
 
 export const scraperManager = {
+  // ... existing methods ...
   getConfig: () => scraperConfig,
   
   updateConfig: (newConfig) => {
@@ -82,6 +61,7 @@ export const scraperManager = {
     return scraperConfig;
   },
 
+  // ... start/stop methods ...
   start: async () => {
     if (scraperConfig.isRunning) return;
     scraperConfig.isRunning = true;
@@ -151,6 +131,26 @@ export const scraperManager = {
     if (!page) return;
     try { await page.mouse.wheel({ deltaY }); } catch (e) {}
   },
+  inspectElement: async (x, y) => {
+    if (!page) return null;
+    try {
+      return await page.evaluate((x, y) => {
+        const el = document.elementFromPoint(x, y);
+        if (!el) return null;
+        return {
+          tagName: el.tagName,
+          id: el.id,
+          className: el.className,
+          innerText: el.innerText?.substring(0, 50) + (el.innerText?.length > 50 ? '...' : ''),
+          attributes: Array.from(el.attributes).reduce((acc, attr) => {
+            acc[attr.name] = attr.value;
+            return acc;
+          }, {}),
+          rect: el.getBoundingClientRect().toJSON()
+        };
+      }, x, y);
+    } catch (e) { return null; }
+  },
   startRemoteBrowser: async () => {
     if (!scraperConfig.isRunning) {
       scraperConfig.method = 'puppeteer';
@@ -172,6 +172,7 @@ export const scraperManager = {
     await page.goto(scraperConfig.targetWebUrl, { waitUntil: 'domcontentloaded' });
   },
   getBrowserLogs: () => browserLogs,
+  getNetworkLogs: () => networkLogs,
   evaluateScript: async (code) => {
     if (!page) return { error: 'Browser not running' };
     try {
@@ -183,121 +184,9 @@ export const scraperManager = {
   }
 };
 
-function startSimulation() {
-  if (simulationInterval) clearInterval(simulationInterval);
-  
-  let value = 1.00;
-  let isRunning = true;
-  let history = []; // Keep track of history for strategies
-  
-  const runGame = () => {
-    value = 1.00;
-    isRunning = true;
-    const crashPoint = Math.random() * 10 + 1;
-    
-    simulationInterval = setInterval(() => {
-      if (!isRunning || !scraperConfig.isRunning) {
-        clearInterval(simulationInterval);
-        return;
-      }
-      
-      value += value * 0.05;
-      
-      if (value >= crashPoint) {
-        isRunning = false;
-        clearInterval(simulationInterval);
-        
-        const finalValue = parseFloat(value.toFixed(2));
-        history.push(finalValue);
-        if (history.length > 50) history.shift();
-        
-        // Save to Database
-        dbManager.addCrash(finalValue);
-        
-        // Analyze with Strategies
-        const pattern = patternRecognition.analyze(history);
-        const rtp = rtpCalculator.calculate(history);
-        
-        // Broadcast to Frontend
-        broadcastSSE({
-          type: 'CRASH',
-          value: finalValue,
-          timestamp: Date.now(),
-          analysis: {
-            pattern,
-            rtp
-          }
-        });
-        
-        if (scraperConfig.isRunning) {
-          setTimeout(runGame, 3000);
-        }
-      } else {
-        // Broadcast live update
-        broadcastSSE({
-          type: 'UPDATE',
-          value: parseFloat(value.toFixed(2)),
-          timestamp: Date.now()
-        });
-      }
-    }, 100);
-  };
-  
-  runGame();
-}
+// ... startSimulation ...
 
-async function runScraperLoop(parser) {
-  console.log(`[SCRAPER] Starting real-time data loop for ${parser.name}...`);
-  
-  let lastValue = 0;
-  let consecutiveErrors = 0;
-
-  const loop = async () => {
-    if (!scraperConfig.isRunning || !page) return;
-
-    try {
-      // 1. Parse Multiplier
-      if (parser.parseMultiplier) {
-        const value = await parser.parseMultiplier(page);
-        
-        if (value && value !== lastValue) {
-          lastValue = value;
-          consecutiveErrors = 0;
-          
-          // Broadcast live update
-          broadcastSSE({
-            type: 'UPDATE',
-            value: parseFloat(value),
-            timestamp: Date.now()
-          });
-        }
-      }
-
-      // 2. Parse History (Every ~2 seconds or on crash)
-      // This is simplified; ideally we detect crash state first
-      if (parser.parseHistory && Math.random() > 0.95) {
-        const history = await parser.parseHistory(page);
-        if (history && history.length > 0) {
-           // Broadcast history update if needed
-           // For now we focus on the live multiplier
-        }
-      }
-
-    } catch (error) {
-      consecutiveErrors++;
-      if (consecutiveErrors > 10) {
-        console.log('[SCRAPER] Too many errors, pausing loop briefly...');
-        await new Promise(r => setTimeout(r, 2000));
-        consecutiveErrors = 0;
-      }
-    }
-
-    // Schedule next iteration
-    setTimeout(loop, 100); // 10 updates per second
-  };
-
-  loop();
-}
+// ... runScraperLoop ...
 
 async function startPuppeteer() {
   scraperConfig.status = 'Launching Headless Browser...';
@@ -346,9 +235,23 @@ async function startPuppeteer() {
       time: new Date().toLocaleTimeString()
     });
   });
+
+  // Capture all network requests for Inspector
+  page.on('requestfinished', req => {
+    networkLogs.push({
+      method: req.method(),
+      url: req.url(),
+      status: req.response()?.status() || '???',
+      type: req.resourceType(),
+      time: new Date().toLocaleTimeString()
+    });
+    if (networkLogs.length > 100) networkLogs.shift();
+  });
   
   // Initialize the Deep Hardcore Engine
   await masterController.initialize(page, scraperConfig);
+  
+  // ... rest of startPuppeteer ...
   
   // Select Parser
   let activeParser = null;

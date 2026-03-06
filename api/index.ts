@@ -160,6 +160,16 @@ app.get("/api/dev/remote-browser/logs", (req, res) => {
   res.json({ logs: scraperManager.getBrowserLogs() });
 });
 
+app.post("/api/dev/remote-browser/inspect", async (req, res) => {
+  const { x, y } = req.body;
+  const element = await scraperManager.inspectElement(x, y);
+  res.json({ element });
+});
+
+app.get("/api/dev/remote-browser/network", (req, res) => {
+  res.json({ logs: scraperManager.getNetworkLogs() });
+});
+
 app.post("/api/dev/remote-browser/eval", async (req, res) => {
   const result = await scraperManager.evaluateScript(req.body.code);
   res.json(result);
