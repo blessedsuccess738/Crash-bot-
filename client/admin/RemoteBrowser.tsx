@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { crashResources } from '../config/crashResources';
 
 export default function RemoteBrowser() {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
@@ -98,20 +99,14 @@ export default function RemoteBrowser() {
           <div>
             <div className="flex justify-between items-end mb-1">
               <label className="block text-[10px] text-gray-500 uppercase font-bold tracking-wider">Target URL</label>
-              <div className="flex gap-2">
-                {['BC.Game', 'Stake', '1Win', 'Pin-Up', 'Spribe'].map((site) => (
+              <div className="flex gap-2 overflow-x-auto pb-1 max-w-[500px] scrollbar-thin scrollbar-thumb-gray-800">
+                {crashResources.map((site) => (
                   <button
-                    key={site}
-                    onClick={() => handleResourceSelect(
-                      site === 'BC.Game' ? 'https://bc.game/game/crash' :
-                      site === 'Stake' ? 'https://stake.com/casino/games/crash' :
-                      site === '1Win' ? 'https://1win.pro/casino/play/aviator' :
-                      site === 'Pin-Up' ? 'https://pin-up.casino/aviator' :
-                      'https://spribe.co/games/aviator'
-                    )}
-                    className="text-[10px] bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white px-2 py-0.5 rounded transition-colors border border-gray-700"
+                    key={site.name}
+                    onClick={() => handleResourceSelect(site.url)}
+                    className="text-[10px] bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white px-2 py-0.5 rounded transition-colors border border-gray-700 whitespace-nowrap"
                   >
-                    {site}
+                    {site.name}
                   </button>
                 ))}
               </div>

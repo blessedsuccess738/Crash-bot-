@@ -7,12 +7,70 @@ import { broadcastSSE } from '../../api/index.js';
 import { externalSites } from '../../client/config/externalSites.config.js';
 import { MasterController } from '../core-engine/MasterController.js';
 
+// Import Parsers
+import { bcgameParser } from './parsers/bcgame.js';
+import { stakeParser } from './parsers/stake.js';
+import { aviatorParser } from './parsers/aviator.js';
+import { websocketSniffer } from './parsers/websocket-sniffer.js';
+import { roobetParser } from './parsers/roobet.js';
+import { duelbitsParser } from './parsers/duelbits.js';
+import { win1Parser } from './parsers/1win.js';
+import { pinUpParser } from './parsers/pin-up.js';
+import { spribeParser } from './parsers/spribe.js';
+import { betFuryParser } from './parsers/betfury.js';
+import { trustDiceParser } from './parsers/trustdice.js';
+import { nanogamesParser } from './parsers/nanogames.js';
+import { bitslerParser } from './parsers/bitsler.js';
+import { earnBetParser } from './parsers/earnbet.js';
+import { rollbitParser } from './parsers/rollbit.js';
+import { gamdomParser } from './parsers/gamdom.js';
+import { csgoEmpireParser } from './parsers/csgoempire.js';
+import { datDropParser } from './parsers/datdrop.js';
+import { keyDropParser } from './parsers/keydrop.js';
+import { hellcaseParser } from './parsers/hellcase.js';
+import { farmskinsParser } from './parsers/farmskins.js';
+import { csgorollParser } from './parsers/csgoroll.js';
+
+// Import Strategies
+import { patternRecognition } from '../predictor-engine/strategies/pattern-recognition.js';
+import { rtpCalculator } from '../predictor-engine/strategies/rtp-calculator.js';
+import { hashCracker } from '../predictor-engine/strategies/hash-cracker.js';
+
+// Import Tools
+import { cookieInjector } from '../tools/cookie-injector.js';
+import { proxyRotator } from '../tools/proxy-rotator.js';
+import { autoBetter } from '../tools/auto-better.js';
+
 let browser = null;
 let page = null;
 let wsClient = null;
 let simulationInterval = null;
 let browserLogs = [];
 const masterController = new MasterController();
+
+const parsers = {
+  'bc.game': bcgameParser,
+  'stake.com': stakeParser,
+  'aviator': aviatorParser,
+  'roobet.com': roobetParser,
+  'duelbits.com': duelbitsParser,
+  '1win.pro': win1Parser,
+  'pin-up.casino': pinUpParser,
+  'spribe.co': spribeParser,
+  'betfury.io': betFuryParser,
+  'trustdice.win': trustDiceParser,
+  'nanogames.io': nanogamesParser,
+  'bitsler.com': bitslerParser,
+  'earnbet.io': earnBetParser,
+  'rollbit.com': rollbitParser,
+  'gamdom.com': gamdomParser,
+  'csgoempire.com': csgoEmpireParser,
+  'datdrop.com': datDropParser,
+  'key-drop.com': keyDropParser,
+  'hellcase.com': hellcaseParser,
+  'farmskins.com': farmskinsParser,
+  'csgoroll.com': csgorollParser
+};
 
 export const scraperManager = {
   getConfig: () => scraperConfig,
@@ -128,6 +186,7 @@ function startSimulation() {
   
   let value = 1.00;
   let isRunning = true;
+  let history = []; // Keep track of history for strategies
   
   const runGame = () => {
     value = 1.00;
@@ -147,15 +206,25 @@ function startSimulation() {
         clearInterval(simulationInterval);
         
         const finalValue = parseFloat(value.toFixed(2));
+        history.push(finalValue);
+        if (history.length > 50) history.shift();
         
         // Save to Database
         dbManager.addCrash(finalValue);
+        
+        // Analyze with Strategies
+        const pattern = patternRecognition.analyze(history);
+        const rtp = rtpCalculator.calculate(history);
         
         // Broadcast to Frontend
         broadcastSSE({
           type: 'CRASH',
           value: finalValue,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          analysis: {
+            pattern,
+            rtp
+          }
         });
         
         if (scraperConfig.isRunning) {
@@ -226,32 +295,30 @@ async function startPuppeteer() {
   // Initialize the Deep Hardcore Engine
   await masterController.initialize(page, scraperConfig);
   
-  if (scraperConfig.cookie) {
-    // Convert cookie string to puppeteer cookie objects
-    try {
-      const cookies = scraperConfig.cookie.split(';').map(pair => {
-        const [name, ...rest] = pair.split('=');
-        return {
-          name: name.trim(),
-          value: rest.join('=').trim(),
-          domain: new URL(scraperConfig.targetWebUrl).hostname
-        };
-      });
-      await page.setCookie(...cookies);
-    } catch (e) {
-      console.error('[SCRAPER] Failed to parse cookies', e);
+  // Select Parser
+  let activeParser = null;
+  for (const [domain, parser] of Object.entries(parsers)) {
+    if (scraperConfig.targetWebUrl.includes(domain)) {
+      activeParser = parser;
+      break;
     }
   }
 
-  // Intercept WebSocket frames via CDP
-  const client = await page.target().createCDPSession();
-  await client.send('Network.enable');
+  if (activeParser) {
+    console.log(`[SCRAPER] Activated Parser: ${activeParser.name}`);
+    // In a real implementation, we would attach the parser to the page loop
+    // For now, we just log it
+  } else {
+    console.log('[SCRAPER] No specific parser found. Using generic fallback.');
+  }
 
-  client.on('Network.webSocketFrameReceived', ({ response }) => {
-    const payload = response.payloadData;
-    // Process incoming live crash data from the browser's websocket
-    // console.log('[CDP WS DATA]', payload);
-  });
+  // Inject Cookies if available
+  if (scraperConfig.cookie) {
+    await cookieInjector.inject(page, scraperConfig.cookie);
+  }
+
+  // Start WebSocket Sniffer
+  await websocketSniffer.start(page);
   
   scraperConfig.status = `Navigating to ${scraperConfig.targetWebUrl}...`;
   console.log(`[SCRAPER] Navigating to ${scraperConfig.targetWebUrl}`);
