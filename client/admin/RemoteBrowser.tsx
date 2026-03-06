@@ -10,6 +10,64 @@ export default function RemoteBrowser() {
   const imgRef = useRef<HTMLImageElement>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
+  const startBrowser = async (targetUrl?: string) => {
+    const urlToUse = targetUrl || config.targetWebUrl;
+    setIsActive(true);
+    
+    // Update the input field visually if a specific URL was passed
+    if (targetUrl) {
+      setConfig(prev => ({ ...prev, targetWebUrl: targetUrl }));
+    }
+
+    try {
+      await fetch('/api/dev/remote-browser/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: urlToUse })
+      });
+    } catch (e) {
+      console.error("Failed to start browser", e);
+    }
+  };
+
+  const handleClick = async (e: React.MouseEvent<HTMLImageElement>) => {
+    if (!imgRef.current) return;
+    const rect = imgRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Scale coordinates if image is resized
+    const scaleX = imgRef.current.naturalWidth / rect.width;
+    const scaleY = imgRef.current.naturalHeight / rect.height;
+
+    try {
+      await fetch('/api/dev/remote-browser/click', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ x: x * scaleX, y: y * scaleY })
+      });
+    } catch (err) {
+      console.error("Click failed", err);
+    }
+  };
+
+  const handleEval = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!evalCode.trim()) return;
+    
+    try {
+      const res = await fetch('/api/dev/remote-browser/eval', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: evalCode })
+      });
+      const data = await res.json();
+      setEvalResult(JSON.stringify(data.result, null, 2));
+    } catch (err) {
+      setEvalResult("Error executing code");
+    }
+  };
+
   useEffect(() => {
     // Auto-start the browser when the panel is opened
     startBrowser();
@@ -63,14 +121,14 @@ export default function RemoteBrowser() {
   }, []);
 
   const handleNavigate = async () => {
-    await updateConfig();
     if (isActive) {
-      await fetch('/api/dev/remote-browser/start', { method: 'POST' });
+      await startBrowser();
     }
   };
 
   const handleResourceSelect = (url: string) => {
-    setConfig({ ...config, targetWebUrl: url });
+    // Automatically start browser with the selected URL
+    startBrowser(url);
   };
 
   return (

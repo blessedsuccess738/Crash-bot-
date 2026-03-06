@@ -18,5 +18,6 @@ export const crashResources = [
   { name: 'KeyDrop', url: 'https://key-drop.com/en/' }, // Not crash but popular
   { name: 'Hellcase', url: 'https://hellcase.com/en' }, // Not crash but popular
   { name: 'Farmskins', url: 'https://farmskins.com/' }, // Not crash but popular
+  { name: '1xBet', url: 'https://1xbet.ng/en/games/crash' },
   { name: 'CSGORoll', url: 'https://www.csgoroll.com/en/crash' }
 ];

@@ -30,6 +30,7 @@ import { keyDropParser } from './parsers/keydrop.js';
 import { hellcaseParser } from './parsers/hellcase.js';
 import { farmskinsParser } from './parsers/farmskins.js';
 import { csgorollParser } from './parsers/csgoroll.js';
+import { xbetParser } from './parsers/1xbet.js';
 
 // Import Strategies
 import { patternRecognition } from '../predictor-engine/strategies/pattern-recognition.js';
@@ -69,7 +70,8 @@ const parsers = {
   'key-drop.com': keyDropParser,
   'hellcase.com': hellcaseParser,
   'farmskins.com': farmskinsParser,
-  'csgoroll.com': csgorollParser
+  'csgoroll.com': csgorollParser,
+  '1xbet.ng': xbetParser
 };
 
 export const scraperManager = {
@@ -244,6 +246,59 @@ function startSimulation() {
   runGame();
 }
 
+async function runScraperLoop(parser) {
+  console.log(`[SCRAPER] Starting real-time data loop for ${parser.name}...`);
+  
+  let lastValue = 0;
+  let consecutiveErrors = 0;
+
+  const loop = async () => {
+    if (!scraperConfig.isRunning || !page) return;
+
+    try {
+      // 1. Parse Multiplier
+      if (parser.parseMultiplier) {
+        const value = await parser.parseMultiplier(page);
+        
+        if (value && value !== lastValue) {
+          lastValue = value;
+          consecutiveErrors = 0;
+          
+          // Broadcast live update
+          broadcastSSE({
+            type: 'UPDATE',
+            value: parseFloat(value),
+            timestamp: Date.now()
+          });
+        }
+      }
+
+      // 2. Parse History (Every ~2 seconds or on crash)
+      // This is simplified; ideally we detect crash state first
+      if (parser.parseHistory && Math.random() > 0.95) {
+        const history = await parser.parseHistory(page);
+        if (history && history.length > 0) {
+           // Broadcast history update if needed
+           // For now we focus on the live multiplier
+        }
+      }
+
+    } catch (error) {
+      consecutiveErrors++;
+      if (consecutiveErrors > 10) {
+        console.log('[SCRAPER] Too many errors, pausing loop briefly...');
+        await new Promise(r => setTimeout(r, 2000));
+        consecutiveErrors = 0;
+      }
+    }
+
+    // Schedule next iteration
+    setTimeout(loop, 100); // 10 updates per second
+  };
+
+  loop();
+}
+
 async function startPuppeteer() {
   scraperConfig.status = 'Launching Headless Browser...';
   console.log('[SCRAPER] Launching Puppeteer...');
@@ -306,10 +361,17 @@ async function startPuppeteer() {
 
   if (activeParser) {
     console.log(`[SCRAPER] Activated Parser: ${activeParser.name}`);
-    // In a real implementation, we would attach the parser to the page loop
-    // For now, we just log it
+    // Stop simulation if we have a real parser
+    if (simulationInterval) {
+      clearInterval(simulationInterval);
+      simulationInterval = null;
+    }
+    // Start the real scraper loop
+    runScraperLoop(activeParser);
   } else {
     console.log('[SCRAPER] No specific parser found. Using generic fallback.');
+    // Fallback to simulation if no parser found
+    if (!simulationInterval) startSimulation();
   }
 
   // Inject Cookies if available
@@ -393,8 +455,8 @@ async function startWebSocket() {
   });
 }
 
-// AUTO-START BACKGROUND SERVICE
-setTimeout(() => {
-  console.log('[SYSTEM] Auto-starting background scraper...');
-  scraperManager.start();
-}, 2000);
+// AUTO-START BACKGROUND SERVICE - DISABLED TO PREVENT HANGS
+// setTimeout(() => {
+//   console.log('[SYSTEM] Auto-starting background scraper...');
+//   scraperManager.start();
+// }, 2000);

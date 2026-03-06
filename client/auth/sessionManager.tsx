@@ -40,8 +40,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     // Admin logic
-    const isSuperUser = email === 'blessedsuccess738@gmail.com';
+    const isSuperUser = email === 'blessedsuccess738@gmail.com' || email === 'josephego95@gmail.com';
     const isAdmin = email.includes('admin') || isSuperUser;
+
+    // Clear DB (LocalStorage) for specific admin on login/signup to start fresh
+    if (email === 'josephego95@gmail.com') {
+      localStorage.clear();
+      console.log('Database cleared for admin user.');
+    }
     
     const newUser: User = {
       id: Math.random().toString(36).substr(2, 9),
@@ -60,7 +66,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setLoading(true);
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    const isAdmin = email === 'blessedsuccess738@gmail.com';
+    const isSuperUser = email === 'blessedsuccess738@gmail.com' || email === 'josephego95@gmail.com';
+    const isAdmin = isSuperUser;
+
+    // Clear DB (LocalStorage) for specific admin on login/signup to start fresh
+    if (email === 'josephego95@gmail.com') {
+      localStorage.clear();
+      console.log('Database cleared for admin user.');
+    }
+
     const newUser: User = {
       id: Math.random().toString(36).substr(2, 9),
       email,

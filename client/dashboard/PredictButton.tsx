@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { getPrediction } from '../services/predictorService';
+import { soundManager } from '../utils/soundManager';
 
 // Event bus for communication between components (simple implementation)
 export const predictionEventBus = new EventTarget();
@@ -11,6 +12,7 @@ export default function PredictButton() {
   const handlePredict = async () => {
     if (isAnalyzing) return;
     
+    soundManager.playClick();
     setIsAnalyzing(true);
     
     // Dispatch analyzing event
@@ -23,6 +25,8 @@ export default function PredictButton() {
     // Pass mock history for now
     const mockHistory = Array.from({ length: 10 }, () => (Math.random() * 10).toFixed(2));
     const prediction = await getPrediction(mockHistory);
+    
+    soundManager.playSuccess();
     
     // Dispatch result
     predictionEventBus.dispatchEvent(new CustomEvent('prediction-result', { detail: prediction }));

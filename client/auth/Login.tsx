@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from './sessionManager';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -26,8 +26,40 @@ export default function Login() {
     }
   };
 
+  const [casinoName, setCasinoName] = useState('BC Game');
+  const [casinoLoginUrl, setCasinoLoginUrl] = useState('https://bc.game/login/signin');
+
+  useEffect(() => {
+    // Fetch current casino config from backend
+    fetch('/api/dev/network-config')
+      .then(res => res.json())
+      .then(data => {
+        if (data.targetWebUrl) {
+          if (data.targetWebUrl.includes('1xbet')) {
+            setCasinoName('1xBet');
+            setCasinoLoginUrl('https://1xbet.ng/en/user/login');
+          } else if (data.targetWebUrl.includes('bc.game')) {
+            setCasinoName('BC Game');
+            setCasinoLoginUrl('https://bc.game/login/signin');
+          } else {
+            // Generic fallback or extract domain
+            try {
+              const url = new URL(data.targetWebUrl);
+              const name = url.hostname.replace('www.', '').split('.')[0];
+              setCasinoName(name.charAt(0).toUpperCase() + name.slice(1));
+              setCasinoLoginUrl(url.origin);
+            } catch (e) {
+              setCasinoName('Casino');
+              setCasinoLoginUrl(data.targetWebUrl);
+            }
+          }
+        }
+      })
+      .catch(err => console.error('Failed to fetch casino config', err));
+  }, []);
+
   const handleCasinoLogin = () => {
-    window.open('https://bc.game/login/signin', '_blank');
+    window.open(casinoLoginUrl, '_blank');
   };
 
   return (
@@ -88,7 +120,7 @@ export default function Login() {
             onClick={handleCasinoLogin}
             className="w-full bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 rounded-lg transition-colors flex items-center justify-center gap-2 mb-4"
           >
-            <span>Login to BC Game</span>
+            <span>Login to {casinoName}</span>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
           </button>
           
