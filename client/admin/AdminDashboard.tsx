@@ -12,6 +12,9 @@ interface UserData {
   lastLogin: string;
   ip: string;
   status: 'active' | 'banned';
+  role: string;
+  access_expires_at: string;
+  created_at: string;
 }
 
 export default function AdminDashboard() {
@@ -20,6 +23,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState({ totalUsers: 0, activeKeys: 0, systemHealth: 'Good' });
   const [newUserEmail, setNewUserEmail] = useState('');
   const [keyDays, setKeyDays] = useState(30);
+  const [activeSection, setActiveSection] = useState<'users' | 'browser' | 'system' | 'database'>('browser');
 
   useEffect(() => {
     fetchUsers();
@@ -107,99 +111,148 @@ export default function AdminDashboard() {
 
         <InstallApp />
 
-        <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden shadow-xl mb-8">
-          <div className="p-4 border-b border-gray-700 bg-gray-800/50 flex justify-between items-center">
-            <h2 className="font-bold text-lg">User Management</h2>
-            <form onSubmit={addUser} className="flex gap-2">
-              <input 
-                type="email" 
-                value={newUserEmail}
-                onChange={e => setNewUserEmail(e.target.value)}
-                placeholder="Add user email..."
-                className="bg-gray-900 border border-gray-600 rounded px-3 py-1 text-sm text-white focus:border-emerald-500 outline-none"
-              />
-              <button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded text-sm font-bold">
-                Add User
-              </button>
-            </form>
-          </div>
-          
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-gray-900/50 text-gray-400 text-xs uppercase">
-                <tr>
-                  <th className="p-4">User Email</th>
-                  <th className="p-4">Role</th>
-                  <th className="p-4">Access Key</th>
-                  <th className="p-4">Created At</th>
-                  <th className="p-4 text-right">
-                    Actions 
-                    <span className="ml-2 text-[10px] normal-case opacity-70">
-                      (Key Days: <input type="number" value={keyDays} onChange={e => setKeyDays(Number(e.target.value))} className="w-8 bg-transparent border-b border-gray-500 text-center" />)
-                    </span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-700">
-                {users.map((user: any) => (
-                  <tr key={user.id} className="hover:bg-gray-700/30 transition-colors">
-                    <td className="p-4 font-medium">{user.email}</td>
-                    <td className="p-4">
-                      <span className={`px-2 py-1 rounded text-xs font-bold ${
-                        user.role === 'admin' ? 'bg-purple-500/10 text-purple-400' : 'bg-gray-500/10 text-gray-400'
-                      }`}>
-                        {user.role ? user.role.toUpperCase() : 'USER'}
-                      </span>
-                    </td>
-                    <td className="p-4 font-mono text-sm text-gray-300">
-                      {user.access_key ? (
-                        <div className="flex flex-col">
-                          <span className="bg-gray-900 px-2 py-1 rounded border border-gray-600 text-emerald-400">
-                            {user.access_key}
-                          </span>
-                          <span className="text-[10px] text-gray-500 mt-1">
-                            Expires: {new Date(user.access_expires_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-gray-500 italic">No Key</span>
-                      )}
-                    </td>
-                    <td className="p-4 text-sm text-gray-400">
-                      {new Date(user.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="p-4 text-right space-x-2">
-                      <button 
-                        onClick={() => generateKey(user.id)}
-                        className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded text-xs font-bold transition-colors"
-                      >
-                        Gen Key
-                      </button>
-                      <button 
-                        onClick={() => toggleAdmin(user.id, user.role)}
-                        className={`px-3 py-1 rounded text-xs font-bold transition-colors ${
-                          user.role === 'admin'
-                            ? 'bg-purple-600/20 text-purple-400 hover:bg-purple-600/40 border border-purple-600/30' 
-                            : 'bg-gray-600/20 text-gray-400 hover:bg-gray-600/40 border border-gray-600/30'
-                        }`}
-                      >
-                        {user.role === 'admin' ? 'Demote' : 'Make Admin'}
-                      </button>
-                      <button 
-                        onClick={() => deleteUser(user.id)}
-                        className="bg-red-600/20 text-red-400 hover:bg-red-600/40 border border-red-600/30 px-3 py-1 rounded text-xs font-bold transition-colors"
-                      >
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        {/* Navigation Tabs */}
+        <div className="flex border-b border-gray-700 mb-6">
+          {[
+            { id: 'browser', label: 'Remote Browser' },
+            { id: 'users', label: 'User Management' },
+            { id: 'system', label: 'System Logs' },
+            { id: 'database', label: 'Database' }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveSection(tab.id as any)}
+              className={`px-6 py-3 text-sm font-bold uppercase tracking-wider border-b-2 transition-colors ${
+                activeSection === tab.id
+                  ? 'border-emerald-500 text-emerald-400 bg-emerald-500/5'
+                  : 'border-transparent text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        <RemoteBrowser />
+        {/* Remote Browser Section */}
+        {activeSection === 'browser' && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <RemoteBrowser />
+          </motion.div>
+        )}
+
+        {/* User Management Section */}
+        {activeSection === 'users' && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden shadow-xl mb-8">
+            <div className="p-4 border-b border-gray-700 bg-gray-800/50 flex justify-between items-center">
+              <h2 className="font-bold text-lg">User Management</h2>
+              <form onSubmit={addUser} className="flex gap-2">
+                <input 
+                  type="email" 
+                  value={newUserEmail}
+                  onChange={e => setNewUserEmail(e.target.value)}
+                  placeholder="Add user email..."
+                  className="bg-gray-900 border border-gray-600 rounded px-3 py-1 text-sm text-white focus:border-emerald-500 outline-none"
+                />
+                <button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded text-sm font-bold">
+                  Add User
+                </button>
+              </form>
+            </div>
+            
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-gray-900/50 text-gray-400 text-xs uppercase">
+                  <tr>
+                    <th className="p-4">User Email</th>
+                    <th className="p-4">Role</th>
+                    <th className="p-4">Access Key</th>
+                    <th className="p-4">Created At</th>
+                    <th className="p-4 text-right">
+                      Actions 
+                      <span className="ml-2 text-[10px] normal-case opacity-70">
+                        (Key Days: <input type="number" value={keyDays} onChange={e => setKeyDays(Number(e.target.value))} className="w-8 bg-transparent border-b border-gray-500 text-center" />)
+                      </span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-700">
+                  {users.map((user: any) => (
+                    <tr key={user.id} className="hover:bg-gray-700/30 transition-colors">
+                      <td className="p-4 font-medium">{user.email}</td>
+                      <td className="p-4">
+                        <span className={`px-2 py-1 rounded text-xs font-bold ${
+                          user.role === 'admin' ? 'bg-purple-500/10 text-purple-400' : 'bg-gray-500/10 text-gray-400'
+                        }`}>
+                          {user.role ? user.role.toUpperCase() : 'USER'}
+                        </span>
+                      </td>
+                      <td className="p-4 font-mono text-sm text-gray-300">
+                        {user.access_key ? (
+                          <div className="flex flex-col">
+                            <span className="bg-gray-900 px-2 py-1 rounded border border-gray-600 text-emerald-400">
+                              {user.access_key}
+                            </span>
+                            <span className="text-[10px] text-gray-500 mt-1">
+                              Expires: {new Date(user.access_expires_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-500 italic">No Key</span>
+                        )}
+                      </td>
+                      <td className="p-4 text-sm text-gray-400">
+                        {new Date(user.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="p-4 text-right space-x-2">
+                        <button 
+                          onClick={() => generateKey(user.id)}
+                          className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded text-xs font-bold transition-colors"
+                        >
+                          Gen Key
+                        </button>
+                        <button 
+                          onClick={() => toggleAdmin(user.id, user.role)}
+                          className={`px-3 py-1 rounded text-xs font-bold transition-colors ${
+                            user.role === 'admin'
+                              ? 'bg-purple-600/20 text-purple-400 hover:bg-purple-600/40 border border-purple-600/30' 
+                              : 'bg-gray-600/20 text-gray-400 hover:bg-gray-600/40 border border-gray-600/30'
+                          }`}
+                        >
+                          {user.role === 'admin' ? 'Demote' : 'Make Admin'}
+                        </button>
+                        <button 
+                          onClick={() => deleteUser(user.id)}
+                          className="bg-red-600/20 text-red-400 hover:bg-red-600/40 border border-red-600/30 px-3 py-1 rounded text-xs font-bold transition-colors"
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        )}
+
+        {/* System Logs Section */}
+        {activeSection === 'system' && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-gray-800 rounded-xl border border-gray-700 p-8 text-center text-gray-500">
+            <div className="text-4xl mb-4">🖥️</div>
+            <h3 className="text-xl font-bold text-white mb-2">System Logs</h3>
+            <p>Server logs and system health metrics will appear here.</p>
+          </motion.div>
+        )}
+
+        {/* Database Section */}
+        {activeSection === 'database' && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-gray-800 rounded-xl border border-gray-700 p-8 text-center text-gray-500">
+            <div className="text-4xl mb-4">🗄️</div>
+            <h3 className="text-xl font-bold text-white mb-2">Database Management</h3>
+            <p>Direct database query tools and backup options will appear here.</p>
+          </motion.div>
+        )}
+
       </div>
     </div>
   );

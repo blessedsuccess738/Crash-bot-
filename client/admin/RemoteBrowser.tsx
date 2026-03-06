@@ -43,7 +43,7 @@ export default function RemoteBrowser() {
     }
   }, []);
 
-  const [activeTab, setActiveTab] = useState<'console' | 'network' | 'inspector'>('console');
+  const [activeTab, setActiveTab] = useState<'console' | 'network' | 'inspector' | 'automation'>('console');
   const [inspectMode, setInspectMode] = useState(false);
   const [networkLogs, setNetworkLogs] = useState<any[]>([]);
   const [inspectedElement, setInspectedElement] = useState<any>(null);
@@ -243,7 +243,7 @@ export default function RemoteBrowser() {
         <div className="w-full lg:w-[400px] flex flex-col bg-[#050505] border-l border-gray-800">
           {/* Tabs */}
           <div className="flex border-b border-gray-800 bg-[#0a0a0a]">
-            {['console', 'network', 'inspector'].map((tab) => (
+            {['console', 'network', 'inspector', 'automation'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as any)}
@@ -421,6 +421,68 @@ export default function RemoteBrowser() {
                   Click 'Select Element' then click anywhere on the browser view to inspect.
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Automation Tab */}
+          {activeTab === 'automation' && (
+            <div className="flex-1 flex flex-col p-4 space-y-4">
+              <div className="flex items-center justify-between border-b border-gray-800 pb-2">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Automation & Macros</h3>
+                <div className="flex gap-2">
+                  <button className="text-[10px] bg-red-900/20 text-red-400 border border-red-900/50 px-2 py-1 rounded hover:bg-red-900/40">
+                    ● Record
+                  </button>
+                  <button className="text-[10px] bg-emerald-900/20 text-emerald-400 border border-emerald-900/50 px-2 py-1 rounded hover:bg-emerald-900/40">
+                    ▶ Play
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button className="bg-gray-800 hover:bg-gray-700 p-3 rounded border border-gray-700 flex flex-col items-center gap-2 transition-colors group">
+                  <div className="w-8 h-8 rounded-full bg-gray-900 flex items-center justify-center group-hover:bg-black">
+                    📷
+                  </div>
+                  <span className="text-[10px] text-gray-400 font-bold">Screenshot</span>
+                </button>
+                <button className="bg-gray-800 hover:bg-gray-700 p-3 rounded border border-gray-700 flex flex-col items-center gap-2 transition-colors group">
+                  <div className="w-8 h-8 rounded-full bg-gray-900 flex items-center justify-center group-hover:bg-black">
+                    🎞️
+                  </div>
+                  <span className="text-[10px] text-gray-400 font-bold">Record GIF</span>
+                </button>
+                <button className="bg-gray-800 hover:bg-gray-700 p-3 rounded border border-gray-700 flex flex-col items-center gap-2 transition-colors group">
+                  <div className="w-8 h-8 rounded-full bg-gray-900 flex items-center justify-center group-hover:bg-black">
+                    🖱️
+                  </div>
+                  <span className="text-[10px] text-gray-400 font-bold">Auto-Clicker</span>
+                </button>
+                <button className="bg-gray-800 hover:bg-gray-700 p-3 rounded border border-gray-700 flex flex-col items-center gap-2 transition-colors group">
+                  <div className="w-8 h-8 rounded-full bg-gray-900 flex items-center justify-center group-hover:bg-black">
+                    🔄
+                  </div>
+                  <span className="text-[10px] text-gray-400 font-bold">Refresh Loop</span>
+                </button>
+              </div>
+
+              <div className="flex-1 bg-[#0f0f0f] rounded border border-gray-800 p-2 overflow-y-auto">
+                <div className="text-[10px] text-gray-500 uppercase font-bold mb-2">Macro Sequence</div>
+                <div className="space-y-1">
+                  <div className="text-xs text-gray-400 bg-gray-900 p-1.5 rounded border border-gray-800 flex justify-between">
+                    <span>1. Wait for element #login</span>
+                    <span className="text-gray-600">2s</span>
+                  </div>
+                  <div className="text-xs text-gray-400 bg-gray-900 p-1.5 rounded border border-gray-800 flex justify-between">
+                    <span>2. Click #login-btn</span>
+                    <span className="text-gray-600">0.5s</span>
+                  </div>
+                  <div className="text-xs text-gray-400 bg-gray-900 p-1.5 rounded border border-gray-800 flex justify-between">
+                    <span>3. Type "user@example.com"</span>
+                    <span className="text-gray-600">1s</span>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
