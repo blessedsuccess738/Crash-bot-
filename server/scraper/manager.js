@@ -1,46 +1,7 @@
-import puppeteer from 'puppeteer';
-import WebSocket from 'ws';
-import { scraperConfig } from './config.js';
-import { engine } from '../predictor-engine/engine.js';
-import { dbManager } from '../db/index.js';
-import { broadcastSSE } from '../../api/index.js';
-import { externalSites } from '../../client/config/externalSites.config.js';
-import { MasterController } from '../core-engine/MasterController.js';
+import { browserEngine } from '../browser-engine/main.js';
+import { Inspector } from '../browser-engine/devtools/inspector.js';
 
-// Import Parsers
-import { bcgameParser } from './parsers/bcgame.js';
-import { stakeParser } from './parsers/stake.js';
-import { aviatorParser } from './parsers/aviator.js';
-import { websocketSniffer } from './parsers/websocket-sniffer.js';
-import { roobetParser } from './parsers/roobet.js';
-import { duelbitsParser } from './parsers/duelbits.js';
-import { win1Parser } from './parsers/1win.js';
-import { pinUpParser } from './parsers/pin-up.js';
-import { spribeParser } from './parsers/spribe.js';
-import { betFuryParser } from './parsers/betfury.js';
-import { trustDiceParser } from './parsers/trustdice.js';
-import { nanogamesParser } from './parsers/nanogames.js';
-import { bitslerParser } from './parsers/bitsler.js';
-import { earnBetParser } from './parsers/earnbet.js';
-import { rollbitParser } from './parsers/rollbit.js';
-import { gamdomParser } from './parsers/gamdom.js';
-import { csgoEmpireParser } from './parsers/csgoempire.js';
-import { datDropParser } from './parsers/datdrop.js';
-import { keyDropParser } from './parsers/keydrop.js';
-import { hellcaseParser } from './parsers/hellcase.js';
-import { farmskinsParser } from './parsers/farmskins.js';
-import { csgorollParser } from './parsers/csgoroll.js';
-import { xbetParser } from './parsers/1xbet.js';
-
-// Import Strategies
-import { patternRecognition } from '../predictor-engine/strategies/pattern-recognition.js';
-import { rtpCalculator } from '../predictor-engine/strategies/rtp-calculator.js';
-import { hashCracker } from '../predictor-engine/strategies/hash-cracker.js';
-
-// Import Tools
-import { cookieInjector } from '../tools/cookie-injector.js';
-import { proxyRotator } from '../tools/proxy-rotator.js';
-import { autoBetter } from '../tools/auto-better.js';
+// ... existing imports ...
 
 let browser = null;
 let page = null;
@@ -106,11 +67,8 @@ export const scraperManager = {
       wsClient = null;
     }
     
-    if (browser) {
-      await browser.close();
-      browser = null;
-      page = null;
-    }
+    await browserEngine.stop();
+    page = null;
     
     scraperConfig.status = 'Disconnected';
     console.log('[SCRAPER] Stopped.');
@@ -118,46 +76,31 @@ export const scraperManager = {
 
   // Remote Browser Controls
   getScreenshot: async () => {
-    if (!page) return null;
-    try {
-      return await page.screenshot({ encoding: 'base64', type: 'jpeg', quality: 50 });
-    } catch (e) { return null; }
+    return await browserEngine.getScreenshot();
   },
   sendClick: async (x, y) => {
+    const page = browserEngine.getPage();
     if (!page) return;
     try { await page.mouse.click(x, y); } catch (e) {}
   },
   sendType: async (text) => {
+    const page = browserEngine.getPage();
     if (!page) return;
     try { await page.keyboard.type(text); } catch (e) {}
   },
   sendKey: async (key) => {
+    const page = browserEngine.getPage();
     if (!page) return;
     try { await page.keyboard.press(key); } catch (e) {}
   },
   sendScroll: async (deltaY) => {
+    const page = browserEngine.getPage();
     if (!page) return;
     try { await page.mouse.wheel({ deltaY }); } catch (e) {}
   },
   inspectElement: async (x, y) => {
-    if (!page) return null;
-    try {
-      return await page.evaluate((x, y) => {
-        const el = document.elementFromPoint(x, y);
-        if (!el) return null;
-        return {
-          tagName: el.tagName,
-          id: el.id,
-          className: el.className,
-          innerText: el.innerText?.substring(0, 50) + (el.innerText?.length > 50 ? '...' : ''),
-          attributes: Array.from(el.attributes).reduce((acc, attr) => {
-            acc[attr.name] = attr.value;
-            return acc;
-          }, {}),
-          rect: el.getBoundingClientRect().toJSON()
-        };
-      }, x, y);
-    } catch (e) { return null; }
+    const page = browserEngine.getPage();
+    return await Inspector.inspectElement(page, x, y);
   },
   startRemoteBrowser: async (force = false) => {
     if (force) {
@@ -171,14 +114,15 @@ export const scraperManager = {
         scraperConfig.targetWebUrl = externalSites.crashUrl;
       }
       await scraperManager.start(true);
-    } else if (scraperConfig.method === 'puppeteer' && page) {
-      // If already running, ensure we are at the right URL
-      if (page.url() !== scraperConfig.targetWebUrl) {
+    } else if (scraperConfig.method === 'puppeteer') {
+      const page = browserEngine.getPage();
+      if (page && page.url() !== scraperConfig.targetWebUrl) {
         await page.goto(scraperConfig.targetWebUrl, { waitUntil: 'domcontentloaded' }).catch(e => console.log('Navigation warning:', e.message));
       }
     }
   },
   goToCrash: async () => {
+    const page = browserEngine.getPage();
     if (!page) return;
     scraperConfig.targetWebUrl = externalSites.crashUrl;
     await page.goto(scraperConfig.targetWebUrl, { waitUntil: 'domcontentloaded' });
@@ -186,6 +130,7 @@ export const scraperManager = {
   getBrowserLogs: () => browserLogs,
   getNetworkLogs: () => networkLogs,
   evaluateScript: async (code) => {
+    const page = browserEngine.getPage();
     if (!page) return { error: 'Browser not running' };
     try {
       const result = await page.evaluate(code);
@@ -202,20 +147,14 @@ export const scraperManager = {
 
 async function startPuppeteer() {
   scraperConfig.status = 'Launching Headless Browser...';
-  console.log('[SCRAPER] Launching Puppeteer...');
+  console.log('[SCRAPER] Launching Browser Engine...');
   
-  const args = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'];
-  if (scraperConfig.proxy) {
-    args.push(`--proxy-server=${scraperConfig.proxy}`);
+  await browserEngine.start(scraperConfig.targetWebUrl);
+  page = browserEngine.getPage();
+  
+  if (!page) {
+    throw new Error('Failed to start browser engine');
   }
-
-  browser = await puppeteer.launch({ 
-    headless: "new", 
-    args 
-  });
-  
-  page = await browser.newPage();
-  await page.setUserAgent(scraperConfig.userAgent);
   
   // Capture console logs for DevTools
   page.on('console', async msg => {
@@ -267,6 +206,8 @@ async function startPuppeteer() {
   
   // Select Parser
   let activeParser = null;
+  // ... (rest of parser logic remains same) ...
+
   for (const [domain, parser] of Object.entries(parsers)) {
     if (scraperConfig.targetWebUrl.includes(domain)) {
       activeParser = parser;
@@ -370,8 +311,8 @@ async function startWebSocket() {
   });
 }
 
-// AUTO-START BACKGROUND SERVICE - DISABLED TO PREVENT HANGS
-// setTimeout(() => {
-//   console.log('[SYSTEM] Auto-starting background scraper...');
-//   scraperManager.start();
-// }, 2000);
+// AUTO-START BACKGROUND SERVICE
+setTimeout(() => {
+  console.log('[SYSTEM] Auto-starting background scraper...');
+  scraperManager.startRemoteBrowser();
+}, 5000);
