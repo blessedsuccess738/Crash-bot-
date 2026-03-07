@@ -143,11 +143,11 @@ app.post("/api/dev/remote-browser/scroll", async (req, res) => {
 });
 
 app.post("/api/dev/remote-browser/start", async (req, res) => {
-  const { url } = req.body;
+  const { url, force } = req.body;
   if (url) {
     scraperManager.updateConfig({ targetWebUrl: url });
   }
-  await scraperManager.startRemoteBrowser();
+  await scraperManager.startRemoteBrowser(force);
   res.json({ success: true });
 });
 

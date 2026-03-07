@@ -22,9 +22,10 @@ export default function RemoteBrowser() {
     startBrowser(url);
   };
 
-  const startBrowser = async (targetUrl?: string) => {
+  const startBrowser = async (targetUrl?: string, force = false) => {
     const urlToUse = targetUrl || config.targetWebUrl;
     setIsActive(true);
+    setStatus('Initializing...');
     
     // Update the input field visually if a specific URL was passed
     if (targetUrl) {
@@ -37,11 +38,13 @@ export default function RemoteBrowser() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           url: urlToUse,
-          browser: selectedBrowser 
+          browser: selectedBrowser,
+          force
         })
       });
     } catch (e) {
       console.error("Failed to start browser", e);
+      setStatus('Connection Failed');
     }
   };
 
@@ -183,7 +186,7 @@ export default function RemoteBrowser() {
             </label>
 
             <button 
-              onClick={() => startBrowser()}
+              onClick={() => isActive ? startBrowser(undefined, true) : startBrowser()}
               className={`px-4 py-1.5 rounded text-sm font-bold transition-all ${
                 isActive 
                   ? 'bg-red-900/30 text-red-400 hover:bg-red-900/50 border border-red-900/50' 

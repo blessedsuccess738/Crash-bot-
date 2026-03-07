@@ -62,10 +62,18 @@ export const scraperManager = {
   },
 
   // ... start/stop methods ...
-  start: async () => {
-    if (scraperConfig.isRunning) return;
+  start: async (force = false) => {
+    if (scraperConfig.isRunning && !force) {
+      console.log('[SCRAPER] Already running. Use force=true to restart.');
+      return;
+    }
+    
+    if (force && scraperConfig.isRunning) {
+      await scraperManager.stop();
+    }
+
     scraperConfig.isRunning = true;
-    scraperConfig.status = 'Connecting...';
+    scraperConfig.status = 'Initializing...';
 
     try {
       if (scraperConfig.method === 'puppeteer') {
@@ -151,14 +159,18 @@ export const scraperManager = {
       }, x, y);
     } catch (e) { return null; }
   },
-  startRemoteBrowser: async () => {
+  startRemoteBrowser: async (force = false) => {
+    if (force) {
+      await scraperManager.stop();
+    }
+
     if (!scraperConfig.isRunning) {
       scraperConfig.method = 'puppeteer';
       // Only set default if not already set by user
       if (!scraperConfig.targetWebUrl) {
         scraperConfig.targetWebUrl = externalSites.crashUrl;
       }
-      await scraperManager.start();
+      await scraperManager.start(true);
     } else if (scraperConfig.method === 'puppeteer' && page) {
       // If already running, ensure we are at the right URL
       if (page.url() !== scraperConfig.targetWebUrl) {
