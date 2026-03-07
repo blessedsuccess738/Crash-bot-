@@ -92,6 +92,21 @@ export default function RemoteBrowser() {
 
   const startBrowser = async (targetUrl?: string, force = false) => {
     const urlToUse = targetUrl || config.targetWebUrl;
+    
+    // Check if already running before starting unless force
+    if (!force) {
+      try {
+        const checkRes = await fetch('/api/dev/network-config');
+        const checkData = await checkRes.json();
+        if (checkData.isRunning && checkData.status.includes('Connected')) {
+          console.log("Browser already running, skipping start");
+          setIsActive(true);
+          fetchTabs();
+          return;
+        }
+      } catch (e) {}
+    }
+
     setIsActive(true);
     setStatus('Navigating...');
     
@@ -125,9 +140,10 @@ export default function RemoteBrowser() {
   }, []);
 
   // ... existing handlers ...
-  const [activeTab, setActiveTab] = useState<'web' | 'console' | 'network' | 'inspector' | 'automation'>('web');
+  const [activeTab, setActiveTab] = useState<'web' | 'console' | 'network' | 'inspector' | 'automation' | 'system'>('web');
   const [inspectMode, setInspectMode] = useState(false);
   const [networkLogs, setNetworkLogs] = useState<any[]>([]);
+  const [systemLogs, setSystemLogs] = useState<any[]>([]);
   const [inspectedElement, setInspectedElement] = useState<any>(null);
 
   const handleClick = async (e: React.MouseEvent<HTMLImageElement>) => {
@@ -190,6 +206,10 @@ export default function RemoteBrowser() {
             const netRes = await fetch('/api/dev/remote-browser/network');
             const netData = await netRes.json();
             if (netData.logs) setNetworkLogs(netData.logs);
+          } else if (activeTab === 'system') {
+            const sysRes = await fetch('/api/dev/remote-browser/system-logs');
+            const sysData = await sysRes.json();
+            if (sysData.logs) setSystemLogs(sysData.logs);
           }
         } catch (e) {
           console.error("Failed to fetch data", e);
@@ -289,10 +309,17 @@ export default function RemoteBrowser() {
               </button>
               <button 
                 onClick={handleReload}
-                className={`p-1 hover:bg-[#333] rounded transition-colors ${isActive ? '' : 'animate-spin'}`}
+                className="p-1 hover:bg-[#333] rounded transition-colors"
                 title="Refresh Page"
               >
                 <RotateCw className="w-4 h-4 text-gray-400" />
+              </button>
+              <button 
+                onClick={() => startBrowser(config.targetWebUrl, true)}
+                className={`p-1 hover:bg-[#333] rounded transition-colors ${isActive ? '' : 'animate-spin'}`}
+                title="Force Restart Browser"
+              >
+                <RotateCw className="w-4 h-4 text-emerald-500" />
               </button>
               <button 
                 onClick={() => handleResourceSelect('https://bc.game/game/crash')}
@@ -436,6 +463,23 @@ export default function RemoteBrowser() {
                  </div>
                )}
 
+               {/* System Logs Tab */}
+               {activeTab === 'system' && (
+                 <div className="flex-1 flex flex-col">
+                   <div className="p-2 border-b border-[#333] bg-[#1E1E1E]">
+                     <span className="text-xs font-bold text-gray-400">System Logs</span>
+                   </div>
+                   <div className="flex-1 overflow-y-auto p-2 font-mono text-[10px] space-y-1">
+                     {systemLogs.map((log, i) => (
+                       <div key={i} className="text-gray-400 border-b border-[#222] pb-1">
+                         <span className="text-emerald-500/50 mr-2">[{log.time}]</span>
+                         {log.text}
+                       </div>
+                     ))}
+                   </div>
+                 </div>
+               )}
+
                {/* Automation Tab */}
                {activeTab === 'automation' && (
                  <div className="flex-1 p-4 grid grid-cols-2 gap-4 content-start">
@@ -491,6 +535,7 @@ export default function RemoteBrowser() {
             { id: 'web', icon: LayoutPanelLeft, label: 'View' },
             { id: 'console', icon: Terminal, label: 'Console' },
             { id: 'network', icon: Activity, label: 'Network' },
+            { id: 'system', icon: Terminal, label: 'System' },
             { id: 'inspector', icon: Search, label: 'Inspect' },
             { id: 'automation', icon: PlayCircle, label: 'Macros' }
           ].map(tab => (

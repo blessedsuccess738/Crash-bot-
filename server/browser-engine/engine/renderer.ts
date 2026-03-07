@@ -14,9 +14,10 @@ export class Renderer {
       if (!this.browser) {
         Logger.info('Launching browser engine...');
         this.browser = await puppeteer.launch({
-          headless: browserConfig.headless ? 'new' : false,
+          headless: browserConfig.headless ? true : false,
           args: browserConfig.args,
-          defaultViewport: browserConfig.viewport
+          defaultViewport: browserConfig.viewport,
+          executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
         });
       }
 
@@ -40,7 +41,7 @@ export class Renderer {
       this.activePageId = id;
       
       Logger.info(`Created tab ${id}, navigating to ${url}...`);
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: browserConfig.defaultTimeout });
+      page.goto(url, { waitUntil: 'domcontentloaded', timeout: browserConfig.defaultTimeout }).catch(e => Logger.warn(`Navigation to ${url} warning: ${e.message}`));
       
       return page;
     } catch (error) {

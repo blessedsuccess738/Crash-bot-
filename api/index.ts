@@ -205,6 +205,10 @@ app.get("/api/dev/remote-browser/network", (req, res) => {
   res.json({ logs: scraperManager.getNetworkLogs() });
 });
 
+app.get("/api/dev/remote-browser/system-logs", (req, res) => {
+  res.json({ logs: scraperManager.getSystemLogs() });
+});
+
 app.post("/api/dev/remote-browser/eval", async (req, res) => {
   const result = await scraperManager.evaluateScript(req.body.code);
   res.json(result);

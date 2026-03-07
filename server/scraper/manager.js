@@ -1,20 +1,30 @@
 import { browserEngine } from '../browser-engine/main.js';
 import { Inspector } from '../browser-engine/devtools/inspector.js';
+import { scraperConfig } from './config.js';
+import { externalSites } from '../../client/config/externalSites.config.js';
+import { MasterController } from '../core-engine/MasterController.js';
+import { bcgameParser } from './parsers/bcgame.js';
+import { websocketSniffer } from './parsers/websocket-sniffer.js';
+import WebSocket from 'ws';
 
-// ... existing imports ...
-
-let browser = null;
-let page = null;
 let wsClient = null;
 let simulationInterval = null;
 let browserLogs = [];
-let networkLogs = []; // New network logs
+let networkLogs = [];
+let systemLogs = [];
 const masterController = new MasterController();
 
-// ... parsers definition ...
+function logSystem(text) {
+  systemLogs.push({ text, time: new Date().toLocaleTimeString() });
+  if (systemLogs.length > 100) systemLogs.shift();
+  console.log(`[SYSTEM LOG] ${text}`);
+}
+
+const parsers = {
+  'bc.game': bcgameParser
+};
 
 export const scraperManager = {
-  // ... existing methods ...
   getConfig: () => scraperConfig,
   
   updateConfig: (newConfig) => {
@@ -22,14 +32,15 @@ export const scraperManager = {
     return scraperConfig;
   },
 
-  // ... start/stop methods ...
   start: async (force = false) => {
+    logSystem(`Starting scraper (force=${force})...`);
     if (scraperConfig.isRunning && !force) {
-      console.log('[SCRAPER] Already running. Use force=true to restart.');
+      logSystem('Already running. Use force=true to restart.');
       return;
     }
     
     if (force && scraperConfig.isRunning) {
+      logSystem('Stopping existing instance for force restart...');
       await scraperManager.stop();
     }
 
@@ -38,7 +49,7 @@ export const scraperManager = {
 
     try {
       if (scraperConfig.method === 'puppeteer') {
-        await startPuppeteer();
+        await startPuppeteer(force);
       } else {
         await startWebSocket();
       }
@@ -47,6 +58,7 @@ export const scraperManager = {
       startSimulation();
       
     } catch (error) {
+      logSystem(`Start error: ${error.message}`);
       scraperConfig.status = `Error: ${error.message}`;
       scraperConfig.isRunning = false;
       console.error('[SCRAPER ERROR]', error);
@@ -54,6 +66,7 @@ export const scraperManager = {
   },
 
   stop: async () => {
+    logSystem('Stopping scraper...');
     scraperConfig.isRunning = false;
     scraperConfig.status = 'Disconnecting...';
     
@@ -68,10 +81,9 @@ export const scraperManager = {
     }
     
     await browserEngine.stop();
-    page = null;
     
     scraperConfig.status = 'Disconnected';
-    console.log('[SCRAPER] Stopped.');
+    logSystem('Scraper stopped.');
   },
 
   // Remote Browser Controls
@@ -110,7 +122,6 @@ export const scraperManager = {
 
     if (!scraperConfig.isRunning) {
       scraperConfig.method = 'puppeteer';
-      // Only set default if not already set by user
       if (!scraperConfig.targetWebUrl) {
         scraperConfig.targetWebUrl = externalSites.crashUrl;
       }
@@ -152,6 +163,7 @@ export const scraperManager = {
   },
   getBrowserLogs: () => browserLogs,
   getNetworkLogs: () => networkLogs,
+  getSystemLogs: () => systemLogs,
   evaluateScript: async (code) => {
     const page = browserEngine.getPage();
     if (!page) return { error: 'Browser not running' };
@@ -164,22 +176,41 @@ export const scraperManager = {
   }
 };
 
-// ... startSimulation ...
+function startSimulation() {
+  if (simulationInterval) clearInterval(simulationInterval);
+  simulationInterval = setInterval(() => {
+    // Simulated data for UI testing
+  }, 1000);
+}
 
-// ... runScraperLoop ...
+async function runScraperLoop(parser) {
+  while (scraperConfig.isRunning) {
+    const page = browserEngine.getPage();
+    if (page) {
+      const multiplier = await parser.parseMultiplier(page);
+      if (multiplier) {
+        // Handle multiplier
+      }
+    }
+    await new Promise(r => setTimeout(r, 500));
+  }
+}
 
-async function startPuppeteer() {
+async function startPuppeteer(force = false) {
+  logSystem(`Launching Puppeteer (force=${force})...`);
   scraperConfig.status = 'Launching Headless Browser...';
   console.log('[SCRAPER] Launching Browser Engine...');
   
-  await browserEngine.start(scraperConfig.targetWebUrl);
-  page = browserEngine.getPage();
+  await browserEngine.start(scraperConfig.targetWebUrl, force);
+  const page = browserEngine.getPage();
   
   if (!page) {
+    logSystem('Failed to start browser engine.');
     throw new Error('Failed to start browser engine');
   }
   
-  // Capture console logs for DevTools
+  logSystem('Browser engine started. Setting up listeners...');
+  
   page.on('console', async msg => {
     const args = await Promise.all(msg.args().map(arg => arg.jsonValue().catch(() => '')));
     const text = args.length ? args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ') : msg.text();
@@ -192,7 +223,6 @@ async function startPuppeteer() {
     if (browserLogs.length > 200) browserLogs.shift();
   });
 
-  // Capture page errors
   page.on('pageerror', err => {
     browserLogs.push({
       type: 'error',
@@ -201,16 +231,14 @@ async function startPuppeteer() {
     });
   });
 
-  // Capture failed requests
   page.on('requestfailed', req => {
     browserLogs.push({
       type: 'warning',
-      text: `[Network Fail] ${req.url()} - ${req.failure().errorText}`,
+      text: `[Network Fail] ${req.url()} - ${req.failure()?.errorText || 'Unknown error'}`,
       time: new Date().toLocaleTimeString()
     });
   });
 
-  // Capture all network requests for Inspector
   page.on('requestfinished', req => {
     networkLogs.push({
       method: req.method(),
@@ -222,15 +250,9 @@ async function startPuppeteer() {
     if (networkLogs.length > 100) networkLogs.shift();
   });
   
-  // Initialize the Deep Hardcore Engine
   await masterController.initialize(page, scraperConfig);
   
-  // ... rest of startPuppeteer ...
-  
-  // Select Parser
   let activeParser = null;
-  // ... (rest of parser logic remains same) ...
-
   for (const [domain, parser] of Object.entries(parsers)) {
     if (scraperConfig.targetWebUrl.includes(domain)) {
       activeParser = parser;
@@ -240,31 +262,21 @@ async function startPuppeteer() {
 
   if (activeParser) {
     console.log(`[SCRAPER] Activated Parser: ${activeParser.name}`);
-    // Stop simulation if we have a real parser
     if (simulationInterval) {
       clearInterval(simulationInterval);
       simulationInterval = null;
     }
-    // Start the real scraper loop
     runScraperLoop(activeParser);
   } else {
     console.log('[SCRAPER] No specific parser found. Using generic fallback.');
-    // Fallback to simulation if no parser found
     if (!simulationInterval) startSimulation();
   }
 
-  // Inject Cookies if available
-  if (scraperConfig.cookie) {
-    await cookieInjector.inject(page, scraperConfig.cookie);
-  }
-
-  // Start WebSocket Sniffer
   await websocketSniffer.start(page);
   
   scraperConfig.status = `Navigating to ${scraperConfig.targetWebUrl}...`;
   console.log(`[SCRAPER] Navigating to ${scraperConfig.targetWebUrl}`);
   
-  // We don't await the full load here to prevent blocking if Cloudflare challenges take time
   page.goto(scraperConfig.targetWebUrl, { waitUntil: 'domcontentloaded' }).catch(e => console.log('Navigation warning:', e.message));
   
   scraperConfig.status = 'Connected (Puppeteer Active)';
@@ -297,7 +309,6 @@ async function startWebSocket() {
 
   wsClient.on('message', (data) => {
     // Process incoming live crash data
-    // console.log('[SCRAPER WS DATA]', data.toString());
   });
 
   wsClient.on('error', (err) => {
@@ -305,12 +316,7 @@ async function startWebSocket() {
     console.error('[SCRAPER] WS Error:', err.message);
     
     if (err.message.includes('200') || err.message.includes('403') || err.message.includes('503')) {
-      console.log('---------------------------------------------------');
-      console.log('⚠️ CLOUDFLARE OR HTTP ENDPOINT DETECTED ⚠️');
-      console.log('The casino is returning a webpage instead of a WebSocket connection.');
       console.log('Auto-switching to Headless Browser (Puppeteer) mode...');
-      console.log('---------------------------------------------------');
-      
       scraperConfig.method = 'puppeteer';
       if (wsClient) {
         wsClient.close();
@@ -339,3 +345,4 @@ setTimeout(() => {
   console.log('[SYSTEM] Auto-starting background scraper...');
   scraperManager.startRemoteBrowser();
 }, 5000);
+

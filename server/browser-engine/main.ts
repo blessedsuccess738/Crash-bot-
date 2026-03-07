@@ -10,9 +10,14 @@ export class BrowserEngine {
     this.renderer = new Renderer();
   }
 
-  async start(url: string = browserConfig.targetUrl) {
-    if (this.isRunning) {
-      Logger.warn('Browser engine already running. Restarting...');
+  async start(url: string = browserConfig.targetUrl, force: boolean = false) {
+    if (this.isRunning && !force) {
+      Logger.info('Browser engine already running.');
+      return;
+    }
+
+    if (force) {
+      Logger.warn('Force restarting browser engine...');
       await this.stop();
     }
 
@@ -23,9 +28,11 @@ export class BrowserEngine {
         this.isRunning = true;
         Logger.info('Browser engine started successfully.');
       } else {
+        this.isRunning = false;
         Logger.error('Failed to start browser engine.');
       }
     } catch (error) {
+      this.isRunning = false;
       Logger.error('Error starting browser engine:', error);
     }
   }
