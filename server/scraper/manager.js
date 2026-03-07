@@ -127,6 +127,28 @@ export const scraperManager = {
     scraperConfig.targetWebUrl = externalSites.crashUrl;
     await page.goto(scraperConfig.targetWebUrl, { waitUntil: 'domcontentloaded' });
   },
+  getTabs: () => browserEngine.getTabs(),
+  createTab: async (url) => {
+    await browserEngine.createTab(url);
+  },
+  switchTab: async (id) => {
+    await browserEngine.switchTab(id);
+  },
+  closeTab: async (id) => {
+    await browserEngine.closeTab(id);
+  },
+  goBack: async () => {
+    const page = browserEngine.getPage();
+    if (page) await page.goBack();
+  },
+  goForward: async () => {
+    const page = browserEngine.getPage();
+    if (page) await page.goForward();
+  },
+  reload: async () => {
+    const page = browserEngine.getPage();
+    if (page) await page.reload();
+  },
   getBrowserLogs: () => browserLogs,
   getNetworkLogs: () => networkLogs,
   evaluateScript: async (code) => {

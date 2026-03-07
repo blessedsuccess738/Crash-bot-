@@ -39,6 +39,22 @@ export class BrowserEngine {
     }
   }
 
+  async createTab(url: string) {
+    return await this.renderer.createTab(url);
+  }
+
+  async switchTab(id: string) {
+    return await this.renderer.switchTab(id);
+  }
+
+  async closeTab(id: string) {
+    return await this.renderer.closeTab(id);
+  }
+
+  getTabs() {
+    return this.renderer.getTabs();
+  }
+
   getPage() {
     return this.renderer.getPage();
   }

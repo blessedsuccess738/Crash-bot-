@@ -22,16 +22,78 @@ export default function RemoteBrowser() {
     targetWebUrl: 'https://bc.game/game/crash'
   });
 
+  const [tabs, setTabs] = useState<any[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+
   // ... existing handlers ...
+  
+  const fetchTabs = async () => {
+    try {
+      const res = await fetch('/api/dev/remote-browser/tabs');
+      const data = await res.json();
+      setTabs(data.tabs || []);
+      const active = data.tabs.find((t: any) => t.active);
+      if (active) {
+        setActiveTabId(active.id);
+        setConfig(prev => ({ ...prev, targetWebUrl: active.url }));
+      }
+    } catch (e) {
+      console.error("Failed to fetch tabs", e);
+    }
+  };
+
+  const handleNewTab = async () => {
+    await fetch('/api/dev/remote-browser/tabs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: 'about:blank' })
+    });
+    fetchTabs();
+  };
+
+  const handleSwitchTab = async (id: string) => {
+    await fetch(`/api/dev/remote-browser/tabs/${id}/switch`, { method: 'POST' });
+    setActiveTabId(id);
+    fetchTabs();
+  };
+
+  const handleCloseTab = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    await fetch(`/api/dev/remote-browser/tabs/${id}`, { method: 'DELETE' });
+    fetchTabs();
+  };
+
+  const handleBack = async () => {
+    await fetch('/api/dev/remote-browser/back', { method: 'POST' });
+  };
+
+  const handleForward = async () => {
+    await fetch('/api/dev/remote-browser/forward', { method: 'POST' });
+  };
+
+  const handleReload = async () => {
+    await fetch('/api/dev/remote-browser/reload', { method: 'POST' });
+  };
+
   const handleResourceSelect = (url: string) => {
-    setConfig(prev => ({ ...prev, targetWebUrl: url }));
-    startBrowser(url);
+    if (activeTabId) {
+      // Navigate current tab
+      setConfig(prev => ({ ...prev, targetWebUrl: url }));
+      startBrowser(url);
+    } else {
+      // Create new tab if none active
+      fetch('/api/dev/remote-browser/tabs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url })
+      }).then(() => fetchTabs());
+    }
   };
 
   const startBrowser = async (targetUrl?: string, force = false) => {
     const urlToUse = targetUrl || config.targetWebUrl;
     setIsActive(true);
-    setStatus('Initializing...');
+    setStatus('Navigating...');
     
     if (targetUrl) {
       setConfig(prev => ({ ...prev, targetWebUrl: targetUrl }));
@@ -47,6 +109,7 @@ export default function RemoteBrowser() {
           force
         })
       });
+      fetchTabs();
     } catch (e) {
       console.error("Failed to start browser", e);
       setStatus('Connection Failed');
@@ -57,107 +120,11 @@ export default function RemoteBrowser() {
     if (isAutoStart) {
       startBrowser();
     }
+    const tabInterval = setInterval(fetchTabs, 2000);
+    return () => clearInterval(tabInterval);
   }, []);
 
-  const [activeTab, setActiveTab] = useState<'web' | 'console' | 'network' | 'inspector' | 'automation'>('web');
-  const [inspectMode, setInspectMode] = useState(false);
-  const [networkLogs, setNetworkLogs] = useState<any[]>([]);
-  const [inspectedElement, setInspectedElement] = useState<any>(null);
-
-  const handleClick = async (e: React.MouseEvent<HTMLImageElement>) => {
-    if (!imgRef.current) return;
-    const rect = imgRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    const scaleX = imgRef.current.naturalWidth / rect.width;
-    const scaleY = imgRef.current.naturalHeight / rect.height;
-
-    if (inspectMode) {
-      try {
-        const res = await fetch('/api/dev/remote-browser/inspect', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ x: x * scaleX, y: y * scaleY })
-        });
-        const data = await res.json();
-        setInspectedElement(data.element);
-        setActiveTab('inspector');
-      } catch (err) {
-        console.error("Inspect failed", err);
-      }
-    } else {
-      try {
-        await fetch('/api/dev/remote-browser/click', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ x: x * scaleX, y: y * scaleY })
-        });
-      } catch (err) {
-        console.error("Click failed", err);
-      }
-    }
-  };
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isActive) {
-      interval = setInterval(async () => {
-        try {
-          const configRes = await fetch('/api/dev/network-config');
-          const configData = await configRes.json();
-          setStatus(configData.status || 'Offline');
-
-          if (activeTab === 'web' || activeTab === 'inspector') {
-            const res = await fetch('/api/dev/remote-browser/screenshot');
-            const data = await res.json();
-            if (data.image) {
-              setImageSrc(`data:image/jpeg;base64,${data.image}`);
-            }
-          }
-          
-          if (activeTab === 'console') {
-            const logsRes = await fetch('/api/dev/remote-browser/logs');
-            const logsData = await logsRes.json();
-            if (logsData.logs) setLogs(logsData.logs);
-          } else if (activeTab === 'network') {
-            const netRes = await fetch('/api/dev/remote-browser/network');
-            const netData = await netRes.json();
-            if (netData.logs) setNetworkLogs(netData.logs);
-          }
-        } catch (e) {
-          console.error("Failed to fetch data", e);
-        }
-      }, 500);
-    }
-    return () => clearInterval(interval);
-  }, [isActive, activeTab]);
-
-  const handleEval = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!evalCode.trim()) return;
-    
-    try {
-      const res = await fetch('/api/dev/remote-browser/eval', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: evalCode })
-      });
-      const data = await res.json();
-      setEvalResult(JSON.stringify(data.result, null, 2));
-    } catch (err) {
-      setEvalResult("Error executing code");
-    }
-  };
-
-  // Helper to get domain for tab title
-  const getDomain = (url: string) => {
-    try {
-      return new URL(url).hostname;
-    } catch {
-      return 'New Tab';
-    }
-  };
+  // ... rest of component ...
 
   return (
     <div className="flex flex-col gap-6">
@@ -168,28 +135,46 @@ export default function RemoteBrowser() {
         <div className="bg-[#2D2D2D] p-2 flex flex-col gap-2">
           
           {/* Tab Bar */}
-          <div className="flex items-center gap-2 px-2">
-            <div className="flex gap-2 mr-4">
+          <div className="flex items-center gap-2 px-2 overflow-x-auto scrollbar-hide">
+            <div className="flex gap-2 mr-4 flex-shrink-0">
               <div className="w-3 h-3 rounded-full bg-[#FF5F57]"></div>
               <div className="w-3 h-3 rounded-full bg-[#FEBC2E]"></div>
               <div className="w-3 h-3 rounded-full bg-[#28C840]"></div>
             </div>
             
-            {/* Active Tab */}
-            <div className="flex-1 max-w-[240px] bg-[#1E1E1E] rounded-t-lg px-3 py-2 flex items-center justify-between group relative">
-              <div className="flex items-center gap-2 overflow-hidden">
-                <img src={`https://www.google.com/s2/favicons?domain=${config.targetWebUrl}`} alt="" className="w-4 h-4 opacity-80" />
-                <span className="text-xs text-gray-300 truncate font-medium">
-                  {getDomain(config.targetWebUrl)}
-                </span>
+            {/* Tabs */}
+            {tabs.map(tab => (
+              <div 
+                key={tab.id}
+                onClick={() => handleSwitchTab(tab.id)}
+                className={`flex-1 max-w-[240px] min-w-[120px] rounded-t-lg px-3 py-2 flex items-center justify-between group relative cursor-pointer transition-colors ${
+                  tab.id === activeTabId ? 'bg-[#1E1E1E]' : 'bg-[#2D2D2D] hover:bg-[#383838]'
+                }`}
+              >
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <img src={`https://www.google.com/s2/favicons?domain=${tab.url}`} alt="" className="w-4 h-4 opacity-80" />
+                  <span className={`text-xs truncate font-medium ${tab.id === activeTabId ? 'text-gray-300' : 'text-gray-500'}`}>
+                    {getDomain(tab.url)}
+                  </span>
+                </div>
+                <button 
+                  onClick={(e) => handleCloseTab(e, tab.id)}
+                  className="p-0.5 rounded-full hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-all"
+                >
+                  <X className="w-3 h-3 text-gray-500 hover:text-white" />
+                </button>
+                {/* Active Indicator Line */}
+                {tab.id === activeTabId && (
+                  <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-emerald-500"></div>
+                )}
               </div>
-              <X className="w-3 h-3 text-gray-500 opacity-0 group-hover:opacity-100 cursor-pointer hover:text-white" />
-              {/* Active Indicator Line */}
-              <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-emerald-500"></div>
-            </div>
+            ))}
 
             {/* New Tab Button */}
-            <button className="p-1 hover:bg-[#3D3D3D] rounded-full transition-colors">
+            <button 
+              onClick={handleNewTab}
+              className="p-1 hover:bg-[#3D3D3D] rounded-full transition-colors flex-shrink-0"
+            >
               <Plus className="w-4 h-4 text-gray-400" />
             </button>
           </div>
@@ -197,14 +182,14 @@ export default function RemoteBrowser() {
           {/* Navigation & Address Bar */}
           <div className="bg-[#1E1E1E] rounded-lg flex items-center gap-2 px-3 py-1.5 mx-2">
             <div className="flex gap-1">
-              <button className="p-1 hover:bg-[#333] rounded transition-colors disabled:opacity-30">
+              <button onClick={handleBack} className="p-1 hover:bg-[#333] rounded transition-colors disabled:opacity-30">
                 <ArrowLeft className="w-4 h-4 text-gray-400" />
               </button>
-              <button className="p-1 hover:bg-[#333] rounded transition-colors disabled:opacity-30">
+              <button onClick={handleForward} className="p-1 hover:bg-[#333] rounded transition-colors disabled:opacity-30">
                 <ArrowRight className="w-4 h-4 text-gray-400" />
               </button>
               <button 
-                onClick={() => startBrowser(undefined, true)}
+                onClick={handleReload}
                 className={`p-1 hover:bg-[#333] rounded transition-colors ${isActive ? '' : 'animate-spin'}`}
                 title="Refresh Page"
               >

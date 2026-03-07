@@ -142,6 +142,41 @@ app.post("/api/dev/remote-browser/scroll", async (req, res) => {
   res.json({ success: true });
 });
 
+app.get("/api/dev/remote-browser/tabs", (req, res) => {
+  res.json({ tabs: scraperManager.getTabs() });
+});
+
+app.post("/api/dev/remote-browser/tabs", async (req, res) => {
+  const { url } = req.body;
+  await scraperManager.createTab(url);
+  res.json({ success: true });
+});
+
+app.post("/api/dev/remote-browser/tabs/:id/switch", async (req, res) => {
+  await scraperManager.switchTab(req.params.id);
+  res.json({ success: true });
+});
+
+app.delete("/api/dev/remote-browser/tabs/:id", async (req, res) => {
+  await scraperManager.closeTab(req.params.id);
+  res.json({ success: true });
+});
+
+app.post("/api/dev/remote-browser/back", async (req, res) => {
+  await scraperManager.goBack();
+  res.json({ success: true });
+});
+
+app.post("/api/dev/remote-browser/forward", async (req, res) => {
+  await scraperManager.goForward();
+  res.json({ success: true });
+});
+
+app.post("/api/dev/remote-browser/reload", async (req, res) => {
+  await scraperManager.reload();
+  res.json({ success: true });
+});
+
 app.post("/api/dev/remote-browser/start", async (req, res) => {
   const { url, force } = req.body;
   if (url) {
