@@ -141,10 +141,46 @@ export default function RemoteBrowser() {
 
   // ... existing handlers ...
   const [activeTab, setActiveTab] = useState<'web' | 'console' | 'network' | 'inspector' | 'automation' | 'system'>('web');
-  const [inspectMode, setInspectMode] = useState(false);
+  const [inspectMode, setInspectMode] = useState(true);
   const [networkLogs, setNetworkLogs] = useState<any[]>([]);
   const [systemLogs, setSystemLogs] = useState<any[]>([]);
   const [inspectedElement, setInspectedElement] = useState<any>(null);
+  const [hoveredRect, setHoveredRect] = useState<{x: number, y: number, width: number, height: number} | null>(null);
+
+  const handleMouseMove = async (e: React.MouseEvent<HTMLImageElement>) => {
+    if (!inspectMode || !imgRef.current) {
+      if (hoveredRect) setHoveredRect(null);
+      return;
+    }
+    
+    const rect = imgRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    const scaleX = imgRef.current.naturalWidth / rect.width;
+    const scaleY = imgRef.current.naturalHeight / rect.height;
+
+    try {
+      const res = await fetch('/api/dev/remote-browser/inspect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ x: x * scaleX, y: y * scaleY })
+      });
+      const data = await res.json();
+      if (data.element && data.element.rect) {
+        setHoveredRect({
+          x: data.element.rect.x / scaleX,
+          y: data.element.rect.y / scaleY,
+          width: data.element.rect.width / scaleX,
+          height: data.element.rect.height / scaleY
+        });
+      } else {
+        setHoveredRect(null);
+      }
+    } catch (err) {
+      setHoveredRect(null);
+    }
+  };
 
   const handleClick = async (e: React.MouseEvent<HTMLImageElement>) => {
     if (!imgRef.current) return;
@@ -165,8 +201,15 @@ export default function RemoteBrowser() {
         const data = await res.json();
         setInspectedElement(data.element);
         setActiveTab('inspector');
+
+        // Auto run click on the element in the remote browser
+        await fetch('/api/dev/remote-browser/click', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ x: x * scaleX, y: y * scaleY })
+        });
       } catch (err) {
-        console.error("Inspect failed", err);
+        console.error("Inspect/Click failed", err);
       }
     } else {
       try {
@@ -343,6 +386,15 @@ export default function RemoteBrowser() {
               <Star className="w-3 h-3 text-gray-600 hover:text-yellow-400 cursor-pointer transition-colors" />
             </div>
 
+            <button 
+              onClick={handleReload}
+              className="flex items-center gap-1.5 px-3 py-1 bg-[#333] hover:bg-[#444] rounded-full text-[11px] font-medium text-gray-300 transition-all border border-[#444] hover:border-emerald-500/30"
+              title="Reload Browser Page"
+            >
+              <RotateCw className="w-3 h-3 text-emerald-400" />
+              Reload
+            </button>
+
             {/* Menu / Settings */}
             <div className="flex gap-1">
                <div className="relative group">
@@ -370,7 +422,7 @@ export default function RemoteBrowser() {
         {/* Main Content Area (Viewport + DevTools) */}
         <div className="flex-1 flex relative bg-[#121212]">
           
-          {/* Web Viewport */}
+          {/* Web ViewPORT */}
           <div className={`flex-1 relative flex flex-col ${activeTab !== 'web' && activeTab !== 'inspector' ? 'hidden' : ''}`}>
              {/* Status Bar Overlay */}
              {status !== 'Connected (Puppeteer Active)' && (
@@ -382,14 +434,30 @@ export default function RemoteBrowser() {
 
              <div className="flex-1 flex items-center justify-center bg-black overflow-hidden relative">
                 {imageSrc ? (
-                  <img 
-                    ref={imgRef}
-                    src={imageSrc} 
-                    alt="Remote Browser" 
-                    className={`w-full h-full object-contain ${inspectMode ? 'cursor-help' : 'cursor-default'}`}
-                    onClick={handleClick}
-                    draggable={false}
-                  />
+                  <div className="relative w-full h-full flex items-center justify-center">
+                    <img 
+                      ref={imgRef}
+                      src={imageSrc} 
+                      alt="Remote Browser" 
+                      className={`max-w-full max-h-full object-contain ${inspectMode ? 'cursor-help' : 'cursor-default'}`}
+                      onClick={handleClick}
+                      onMouseMove={handleMouseMove}
+                      onMouseLeave={() => setHoveredRect(null)}
+                      draggable={false}
+                    />
+                    {/* Hover Highlight Overlay */}
+                    {inspectMode && hoveredRect && (
+                      <div 
+                        className="absolute border border-blue-500 bg-blue-500/10 pointer-events-none z-10 transition-all duration-75"
+                        style={{
+                          left: hoveredRect.x,
+                          top: hoveredRect.y,
+                          width: hoveredRect.width,
+                          height: hoveredRect.height
+                        }}
+                      />
+                    )}
+                  </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center text-gray-600 gap-4">
                     <div className="w-16 h-16 border-4 border-[#333] border-t-emerald-500 rounded-full animate-spin"></div>
