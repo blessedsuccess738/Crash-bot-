@@ -12,6 +12,15 @@ export default function RemoteBrowser() {
 
   const [selectedBrowser, setSelectedBrowser] = useState('chrome');
   const [isAutoStart, setIsAutoStart] = useState(true);
+  const [status, setStatus] = useState('Offline');
+  const [config, setConfig] = useState({
+    targetWebUrl: 'https://bc.game/game/crash'
+  });
+
+  const handleResourceSelect = (url: string) => {
+    setConfig(prev => ({ ...prev, targetWebUrl: url }));
+    startBrowser(url);
+  };
 
   const startBrowser = async (targetUrl?: string) => {
     const urlToUse = targetUrl || config.targetWebUrl;
