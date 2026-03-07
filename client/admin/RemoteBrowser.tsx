@@ -124,7 +124,106 @@ export default function RemoteBrowser() {
     return () => clearInterval(tabInterval);
   }, []);
 
-  // ... rest of component ...
+  // ... existing handlers ...
+  const [activeTab, setActiveTab] = useState<'web' | 'console' | 'network' | 'inspector' | 'automation'>('web');
+  const [inspectMode, setInspectMode] = useState(false);
+  const [networkLogs, setNetworkLogs] = useState<any[]>([]);
+  const [inspectedElement, setInspectedElement] = useState<any>(null);
+
+  const handleClick = async (e: React.MouseEvent<HTMLImageElement>) => {
+    if (!imgRef.current) return;
+    const rect = imgRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    const scaleX = imgRef.current.naturalWidth / rect.width;
+    const scaleY = imgRef.current.naturalHeight / rect.height;
+
+    if (inspectMode) {
+      try {
+        const res = await fetch('/api/dev/remote-browser/inspect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ x: x * scaleX, y: y * scaleY })
+        });
+        const data = await res.json();
+        setInspectedElement(data.element);
+        setActiveTab('inspector');
+      } catch (err) {
+        console.error("Inspect failed", err);
+      }
+    } else {
+      try {
+        await fetch('/api/dev/remote-browser/click', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ x: x * scaleX, y: y * scaleY })
+        });
+      } catch (err) {
+        console.error("Click failed", err);
+      }
+    }
+  };
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isActive) {
+      interval = setInterval(async () => {
+        try {
+          const configRes = await fetch('/api/dev/network-config');
+          const configData = await configRes.json();
+          setStatus(configData.status || 'Offline');
+
+          if (activeTab === 'web' || activeTab === 'inspector') {
+            const res = await fetch('/api/dev/remote-browser/screenshot');
+            const data = await res.json();
+            if (data.image) {
+              setImageSrc(`data:image/jpeg;base64,${data.image}`);
+            }
+          }
+          
+          if (activeTab === 'console') {
+            const logsRes = await fetch('/api/dev/remote-browser/logs');
+            const logsData = await logsRes.json();
+            if (logsData.logs) setLogs(logsData.logs);
+          } else if (activeTab === 'network') {
+            const netRes = await fetch('/api/dev/remote-browser/network');
+            const netData = await netRes.json();
+            if (netData.logs) setNetworkLogs(netData.logs);
+          }
+        } catch (e) {
+          console.error("Failed to fetch data", e);
+        }
+      }, 500);
+    }
+    return () => clearInterval(interval);
+  }, [isActive, activeTab]);
+
+  const handleEval = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!evalCode.trim()) return;
+    
+    try {
+      const res = await fetch('/api/dev/remote-browser/eval', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: evalCode })
+      });
+      const data = await res.json();
+      setEvalResult(JSON.stringify(data.result, null, 2));
+    } catch (err) {
+      setEvalResult("Error executing code");
+    }
+  };
+
+  // Helper to get domain for tab title
+  const getDomain = (url: string) => {
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return 'New Tab';
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6">

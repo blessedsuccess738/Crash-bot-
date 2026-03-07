@@ -5,7 +5,7 @@ export class Inspector {
     if (!page) return null;
     try {
       return await page.evaluate((x, y) => {
-        const el = document.elementFromPoint(x, y);
+        const el = document.elementFromPoint(x, y) as HTMLElement;
         if (!el) return null;
         return {
           tagName: el.tagName,

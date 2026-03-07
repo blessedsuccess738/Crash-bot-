@@ -100,6 +100,7 @@ export const scraperManager = {
   },
   inspectElement: async (x, y) => {
     const page = browserEngine.getPage();
+    if (!page) return null;
     return await Inspector.inspectElement(page, x, y);
   },
   startRemoteBrowser: async (force = false) => {
