@@ -19,7 +19,7 @@ export class Renderer {
       if (!this.browser) {
         Logger.info('Launching browser engine with stealth enabled...');
         this.browser = await (puppeteer as any).launch({
-          headless: browserConfig.headless ? true : false,
+          headless: false, // Force visible browser
           args: [
             ...browserConfig.args,
             '--disable-blink-features=AutomationControlled',

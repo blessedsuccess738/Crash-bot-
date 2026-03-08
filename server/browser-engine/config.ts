@@ -1,6 +1,6 @@
 export const browserConfig = {
   userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-  headless: true,
+  headless: false,
   args: [
     '--no-sandbox',
     '--disable-setuid-sandbox',
@@ -13,6 +13,6 @@ export const browserConfig = {
     '--window-size=1920,1080'
   ],
   viewport: { width: 1920, height: 1080 },
-  defaultTimeout: 30000,
+  defaultTimeout: 60000,
   targetUrl: 'https://bc.game/game/crash'
 };
