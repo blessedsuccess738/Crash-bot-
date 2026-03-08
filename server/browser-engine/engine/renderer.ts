@@ -1,8 +1,13 @@
-import puppeteer, { Browser, Page } from 'puppeteer';
+import puppeteer from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import { Browser, Page } from 'puppeteer';
 import { browserConfig } from '../config.js';
 import { Logger } from '../utils/logger.js';
 import { getRandomUserAgent } from './user_agent.js';
 import { v4 as uuidv4 } from 'uuid';
+
+// Add stealth plugin
+puppeteer.use(StealthPlugin());
 
 export class Renderer {
   private browser: Browser | null = null;
@@ -12,10 +17,16 @@ export class Renderer {
   async launch(url: string = browserConfig.targetUrl): Promise<Page | null> {
     try {
       if (!this.browser) {
-        Logger.info('Launching browser engine...');
-        this.browser = await puppeteer.launch({
+        Logger.info('Launching browser engine with stealth enabled...');
+        this.browser = await (puppeteer as any).launch({
           headless: browserConfig.headless ? true : false,
-          args: browserConfig.args,
+          args: [
+            ...browserConfig.args,
+            '--disable-blink-features=AutomationControlled',
+            '--no-first-run',
+            '--no-service-autorun',
+            '--password-store=basic'
+          ],
           defaultViewport: browserConfig.viewport,
           executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
         });
@@ -36,12 +47,27 @@ export class Renderer {
       const page = await this.browser.newPage();
       await page.setUserAgent(getRandomUserAgent());
       
+      // Extra stealth measures
+      await page.evaluateOnNewDocument(() => {
+        Object.defineProperty(navigator, 'webdriver', { get: () => false });
+      });
+
       const id = uuidv4();
       this.pages.set(id, page);
       this.activePageId = id;
       
       Logger.info(`Created tab ${id}, navigating to ${url}...`);
-      page.goto(url, { waitUntil: 'domcontentloaded', timeout: browserConfig.defaultTimeout }).catch(e => Logger.warn(`Navigation to ${url} warning: ${e.message}`));
+      
+      // Await navigation with a timeout but don't fail if it's just slow
+      try {
+        await page.goto(url, { 
+          waitUntil: 'domcontentloaded', 
+          timeout: browserConfig.defaultTimeout 
+        });
+        Logger.info(`Navigation to ${url} completed.`);
+      } catch (e: any) {
+        Logger.warn(`Navigation to ${url} warning: ${e.message}. Continuing anyway...`);
+      }
       
       return page;
     } catch (error) {
@@ -110,7 +136,7 @@ export class Renderer {
     const page = this.getPage();
     if (!page) return null;
     try {
-      return await page.screenshot({ encoding: 'base64', type: 'jpeg', quality: 60 }) as string;
+      return await page.screenshot({ encoding: 'base64', type: 'jpeg', quality: 80 }) as string;
     } catch (e) {
       return null;
     }

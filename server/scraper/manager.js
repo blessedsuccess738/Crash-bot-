@@ -274,13 +274,26 @@ async function startPuppeteer(force = false) {
 
   await websocketSniffer.start(page);
   
-  scraperConfig.status = `Navigating to ${scraperConfig.targetWebUrl}...`;
-  console.log(`[SCRAPER] Navigating to ${scraperConfig.targetWebUrl}`);
-  
-  page.goto(scraperConfig.targetWebUrl, { waitUntil: 'domcontentloaded' }).catch(e => console.log('Navigation warning:', e.message));
-  
-  scraperConfig.status = 'Connected (Puppeteer Active)';
-  console.log('[SCRAPER] Puppeteer successfully loaded target.');
+  const currentUrl = page.url();
+  if (currentUrl === 'about:blank' || !currentUrl.includes('bc.game')) {
+    scraperConfig.status = `Navigating to ${scraperConfig.targetWebUrl}...`;
+    console.log(`[SCRAPER] Navigating to ${scraperConfig.targetWebUrl}`);
+    
+    try {
+      await page.goto(scraperConfig.targetWebUrl, { 
+        waitUntil: 'domcontentloaded',
+        timeout: 30000 
+      });
+      scraperConfig.status = 'Connected (Puppeteer Active)';
+      console.log('[SCRAPER] Puppeteer successfully loaded target.');
+    } catch (e) {
+      console.log('Navigation warning:', e.message);
+      scraperConfig.status = 'Connected (Limited Visibility)';
+    }
+  } else {
+    scraperConfig.status = 'Connected (Puppeteer Active)';
+    console.log('[SCRAPER] Puppeteer already at target.');
+  }
 }
 
 async function startWebSocket() {

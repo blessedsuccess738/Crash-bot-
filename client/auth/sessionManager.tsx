@@ -94,12 +94,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const validateAccessKey = async (key: string): Promise<boolean> => {
     // In a real app, this would check against the database
-    // For demo, we accept any key starting with "ACCESS-"
+    // For demo, we accept any key starting with "ACCESS-", "DEMO-KEY", or "BSK"
     await new Promise(resolve => setTimeout(resolve, 500));
     
-    if (key.startsWith('ACCESS-') || key === 'DEMO-KEY') {
+    const normalizedKey = key.trim().toUpperCase();
+    if (normalizedKey.startsWith('ACCESS-') || normalizedKey === 'DEMO-KEY' || normalizedKey === 'BSK') {
       if (user) {
-        const updatedUser = { ...user, hasAccessKey: true, accessKey: key };
+        const updatedUser = { ...user, hasAccessKey: true, accessKey: normalizedKey };
         localStorage.setItem('mr_success_user', JSON.stringify(updatedUser));
         setUser(updatedUser);
       }
